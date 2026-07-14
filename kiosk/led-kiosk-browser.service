@@ -1,0 +1,21 @@
+# Install: sudo cp led-kiosk-browser.service /etc/systemd/system/
+#          sudo systemctl enable --now led-kiosk-browser
+# Requires the Pi to auto-login to a graphical session (raspi-config ->
+# System Options -> Boot / Auto Login -> Desktop Autologin) and a minimal
+# window manager (e.g. `sudo apt install matchbox-window-manager`) running
+# before this starts, since Chromium needs an X display.
+[Unit]
+Description=LED kiosk Chromium browser
+After=led-kiosk-backend.service graphical.target
+Requires=led-kiosk-backend.service
+
+[Service]
+Type=simple
+User=pi
+Environment=DISPLAY=:0
+ExecStart=/home/pi/led-kiosk/kiosk/start_kiosk.sh
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=graphical.target

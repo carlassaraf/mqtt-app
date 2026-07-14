@@ -1,0 +1,46 @@
+{
+  "device_name": "LED strip controller",
+  "commands": [
+    {
+      "id": "solid_color",
+      "label": "Solid color",
+      "icon": "ti-square-rounded",
+      "params": [
+        { "name": "color", "type": "color", "default": "#D97757" },
+        { "name": "brightness", "type": "slider", "min": 0, "max": 255, "default": 180 }
+      ]
+    },
+    {
+      "id": "chase",
+      "label": "Chase",
+      "icon": "ti-arrow-right",
+      "params": [
+        { "name": "color", "type": "color", "default": "#3B8BD4" },
+        { "name": "speed_ms", "type": "slider", "min": 10, "max": 1000, "default": 120 }
+      ]
+    },
+    {
+      "id": "rainbow",
+      "label": "Rainbow cycle",
+      "icon": "ti-rainbow",
+      "params": [
+        { "name": "speed_ms", "type": "slider", "min": 10, "max": 1000, "default": 200 }
+      ]
+    },
+    {
+      "id": "pulse",
+      "label": "Pulse",
+      "icon": "ti-heart-rate-monitor",
+      "params": [
+        { "name": "color", "type": "color", "default": "#E85D24" },
+        { "name": "period_ms", "type": "slider", "min": 200, "max": 5000, "default": 1500 }
+      ]
+    },
+    {
+      "id": "off",
+      "label": "Off",
+      "icon": "ti-power",
+      "params": []
+    }
+  ]
+}

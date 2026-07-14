@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>LED strip controller</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <h1>LED strip controller</h1>
+  <div class="status" id="status">
+    <span class="status-dot" id="statusDot"></span>
+    <span id="statusText">connecting…</span>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="tab active" data-tab="commands">Commands</button>
+  <button class="tab" data-tab="log">Log</button>
+  <button class="tab" data-tab="schedule">Schedule</button>
+</nav>
+
+<main>
+  <section id="tab-commands" class="tab-panel active">
+    <div class="command-grid" id="commandGrid"><!-- populated by app.js --></div>
+  </section>
+
+  <section id="tab-log" class="tab-panel">
+    <div class="log-view" id="logView"></div>
+  </section>
+
+  <section id="tab-schedule" class="tab-panel">
+    <div class="schedule-form" id="scheduleForm"></div>
+    <h2 class="section-heading">Pending</h2>
+    <div class="schedule-list" id="scheduleList"></div>
+  </section>
+</main>
+
+<!-- Inline command editor, opened when a command card is tapped -->
+<div class="sheet-backdrop" id="sheetBackdrop">
+  <div class="sheet" id="sheet"></div>
+</div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>
