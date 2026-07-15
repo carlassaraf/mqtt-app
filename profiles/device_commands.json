@@ -4,14 +4,14 @@
   "commands": [
     {
       "id": "FRM",
-      "label": "Show frame",
+      "label": "Mostrar cuadro",
       "value_type": "number",
       "min": 1,
-      "note": "Update 'min'/'max' once you know how many frames are loaded on the device."
+      "note": "Actualizar 'min'/'max' cuando se sepa cuántos cuadros hay cargados en el dispositivo."
     },
     {
       "id": "BRI",
-      "label": "Brightness",
+      "label": "Brillo",
       "value_type": "slider",
       "min": 0,
       "max": 100,
@@ -20,59 +20,59 @@
     },
     {
       "id": "BLK",
-      "label": "Blink",
+      "label": "Parpadeo",
       "value_type": "number",
       "min": 0,
       "unit": "ms",
-      "note": "0 = off"
+      "note": "0 = apagado"
     },
     {
       "id": "ROT",
-      "label": "Rotation speed",
+      "label": "Velocidad de rotación",
       "value_type": "number",
       "min": 0,
       "unit": "ms",
-      "note": "0 = off (marquee effect)"
+      "note": "0 = apagado (efecto de desplazamiento)"
     },
     {
       "id": "INV",
-      "label": "Invert rotation direction",
+      "label": "Invertir dirección de rotación",
       "value_type": "none"
     },
     {
       "id": "AUT",
-      "label": "Resume automatic mode",
+      "label": "Reanudar modo automático",
       "value_type": "none"
     },
     {
       "id": "STA",
-      "label": "Request status",
+      "label": "Solicitar estado",
       "value_type": "none"
     },
     {
       "id": "PPG",
-      "label": "Ping-pong mode",
+      "label": "Modo ping-pong",
       "value_type": "toggle"
     },
     {
       "id": "PPC",
-      "label": "Ping-pong ball color",
+      "label": "Color de la pelota (ping-pong)",
       "value_type": "hex_color",
       "default": "#FF0000"
     },
     {
       "id": "PPK",
-      "label": "Ping-pong background color",
+      "label": "Color de fondo (ping-pong)",
       "value_type": "hex_color",
       "default": "#0000FF"
     },
     {
       "id": "NET",
-      "label": "Disable network (SMS-only afterward)",
+      "label": "Deshabilitar red (solo SMS después)",
       "value_type": "none",
       "fixed_value": "0",
       "confirm": true,
-      "confirm_text": "This disables MQTT on the device immediately. It can only be re-enabled by sending NET1 via SMS from an authorized phone -- not from this app. Continue?"
+      "confirm_text": "Esto deshabilita MQTT en el dispositivo de inmediato. Solo puede reactivarse enviando NET1 por SMS desde un número autorizado, no desde esta app. ¿Continuar?"
     }
   ]
 }

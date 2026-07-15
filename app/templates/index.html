@@ -1,25 +1,25 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-<title>LED strip controller</title>
+<title>Controlador de tira LED</title>
 <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
 
 <header class="topbar">
-  <h1>LED strip controller</h1>
+  <h1>Controlador de tira LED</h1>
   <div class="status" id="status">
     <span class="status-dot" id="statusDot"></span>
-    <span id="statusText">connecting…</span>
+    <span id="statusText">conectando…</span>
   </div>
 </header>
 
 <nav class="tabs">
-  <button class="tab active" data-tab="commands">Commands</button>
-  <button class="tab" data-tab="log">Log</button>
-  <button class="tab" data-tab="schedule">Schedule</button>
+  <button class="tab active" data-tab="commands">Comandos</button>
+  <button class="tab" data-tab="log">Registro</button>
+  <button class="tab" data-tab="schedule">Programación</button>
 </nav>
 
 <main>
@@ -33,7 +33,7 @@
 
   <section id="tab-schedule" class="tab-panel">
     <div class="schedule-form" id="scheduleForm"></div>
-    <h2 class="section-heading">Pending</h2>
+    <h2 class="section-heading">Pendientes</h2>
     <div class="schedule-list" id="scheduleList"></div>
   </section>
 </main>

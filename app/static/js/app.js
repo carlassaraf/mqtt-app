@@ -25,10 +25,10 @@ async function pollStatus() {
     const data = await res.json();
     document.getElementById("statusDot").classList.toggle("connected", data.mqtt_connected);
     document.getElementById("statusText").textContent = data.mqtt_connected
-      ? "broker connected" : "broker offline";
+      ? "broker conectado" : "broker desconectado";
   } catch {
     document.getElementById("statusDot").classList.remove("connected");
-    document.getElementById("statusText").textContent = "app offline";
+    document.getElementById("statusText").textContent = "app sin conexión";
   }
 }
 setInterval(pollStatus, 4000);
@@ -41,7 +41,7 @@ function renderValueField(cmd) {
   if (cmd.fixed_value !== undefined) {
     const note = document.createElement("p");
     note.className = "meta";
-    note.textContent = `Sends ${cmd.id}${cmd.fixed_value} -- no input needed.`;
+    note.textContent = `Envía ${cmd.id}${cmd.fixed_value} -- no requiere valor.`;
     return { el: note, getValue: () => null }; // caller uses cmd.fixed_value directly, not this
   }
 
@@ -49,7 +49,7 @@ function renderValueField(cmd) {
 
   const wrap = document.createElement("div");
   const label = document.createElement("label");
-  label.textContent = cmd.unit ? `value (${cmd.unit})` : "value";
+  label.textContent = cmd.unit ? `valor (${cmd.unit})` : "valor";
   wrap.appendChild(label);
 
   if (cmd.value_type === "slider") {
@@ -94,7 +94,7 @@ function renderValueField(cmd) {
 
   if (cmd.value_type === "toggle") {
     const select = document.createElement("select");
-    select.innerHTML = `<option value="1">On (1)</option><option value="0">Off (0)</option>`;
+    select.innerHTML = `<option value="1">Encendido (1)</option><option value="0">Apagado (0)</option>`;
     wrap.appendChild(select);
     return { el: wrap, getValue: () => Number(select.value) };
   }
@@ -129,7 +129,7 @@ function openCommandSheet(cmd) {
 
   const closeRow = document.createElement("div");
   closeRow.className = "close-row";
-  closeRow.innerHTML = `<button aria-label="Close">&times;</button>`;
+  closeRow.innerHTML = `<button aria-label="Cerrar">&times;</button>`;
   closeRow.querySelector("button").addEventListener("click", () => backdrop.classList.remove("open"));
   sheet.appendChild(closeRow);
 
@@ -139,7 +139,7 @@ function openCommandSheet(cmd) {
 
   const code = document.createElement("p");
   code.className = "meta";
-  code.textContent = `Command code: ${cmd.id}`;
+  code.textContent = `Código de comando: ${cmd.id}`;
   sheet.appendChild(code);
 
   const field = renderValueField(cmd);
@@ -147,25 +147,25 @@ function openCommandSheet(cmd) {
 
   const sendBtn = document.createElement("button");
   sendBtn.className = "primary";
-  sendBtn.textContent = "Send command";
+  sendBtn.textContent = "Enviar comando";
   sendBtn.addEventListener("click", async () => {
-    if (cmd.confirm && !confirm(cmd.confirm_text || "Are you sure?")) return;
+    if (cmd.confirm && !confirm(cmd.confirm_text || "¿Estás seguro?")) return;
 
     const value = cmd.fixed_value !== undefined
       ? cmd.fixed_value
       : (field ? field.getValue() : null);
 
     sendBtn.disabled = true;
-    sendBtn.textContent = "Sending…";
+    sendBtn.textContent = "Enviando…";
     try {
       const res = await fetch("/api/commands/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ command_id: cmd.id, value }),
       });
-      sendBtn.textContent = res.ok ? "Sent" : "Failed";
+      sendBtn.textContent = res.ok ? "Enviado" : "Error";
     } catch {
-      sendBtn.textContent = "Failed";
+      sendBtn.textContent = "Error";
     }
     setTimeout(() => backdrop.classList.remove("open"), 600);
   });
@@ -232,7 +232,7 @@ function populateScheduleCommandSelect() {
   renderField();
 
   const dtLabel = document.createElement("label");
-  dtLabel.textContent = "run at";
+  dtLabel.textContent = "ejecutar el";
   form.appendChild(dtLabel);
   const dtInput = document.createElement("input");
   dtInput.type = "datetime-local";
@@ -240,7 +240,7 @@ function populateScheduleCommandSelect() {
 
   const addBtn = document.createElement("button");
   addBtn.className = "primary";
-  addBtn.textContent = "Schedule command";
+  addBtn.textContent = "Programar comando";
   addBtn.addEventListener("click", async () => {
     if (!dtInput.value) return;
     const cmd = profile.commands.find((c) => c.id === select.value);
@@ -271,7 +271,7 @@ async function loadSchedules() {
         <div>${row.command_id}</div>
         <div class="meta">${when} · ${row.status}</div>
       </div>
-      <button class="btn-cancel">Cancel</button>`;
+      <button class="btn-cancel">Cancelar</button>`;
     item.querySelector(".btn-cancel").addEventListener("click", async () => {
       await fetch(`/api/schedule/${row.id}`, { method: "DELETE" });
       loadSchedules();
