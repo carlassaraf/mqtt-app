@@ -18,7 +18,7 @@ def get_schedules():
 def create_schedule(req: ScheduleRequest):
     if req.run_at.timestamp() <= time.time():
         raise HTTPException(400, "run_at must be in the future")
-    schedule_id = add_scheduled_command(req.command_id, req.args, req.run_at)
+    schedule_id = add_scheduled_command(req.command_id, req.value, req.run_at)
     return {"id": schedule_id, "status": "scheduled"}
 
 

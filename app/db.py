@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS logs (
 CREATE TABLE IF NOT EXISTS scheduled_commands (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     command_id TEXT NOT NULL,
-    args_json TEXT NOT NULL,
+    value_json TEXT NOT NULL,
     run_at REAL NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
     created_at REAL NOT NULL
@@ -61,12 +61,12 @@ def get_recent_logs(limit: int = 200):
     return [dict(r) for r in reversed(rows)]
 
 
-def insert_schedule(command_id: str, args_json: str, run_at: float) -> int:
+def insert_schedule(command_id: str, value_json: str, run_at: float) -> int:
     with get_conn() as conn:
         cur = conn.execute(
-            "INSERT INTO scheduled_commands (command_id, args_json, run_at, created_at) "
+            "INSERT INTO scheduled_commands (command_id, value_json, run_at, created_at) "
             "VALUES (?, ?, ?, ?)",
-            (command_id, args_json, run_at, time.time()),
+            (command_id, value_json, run_at, time.time()),
         )
         return cur.lastrowid
 

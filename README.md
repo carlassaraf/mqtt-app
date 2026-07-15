@@ -44,31 +44,53 @@ to iterate on the UI. You'll need something publishing to the log topic and
 subscribed to the command topic to see it fully come alive (or point it at a
 real broker/device on your network).
 
-## Editing the LED effects
+## The device protocol (Columna RGB)
+
+This targets a specific device firmware: 3-letter command codes + an
+optional value, no separators (`FRM5`, `BRI70`, `PPCFF0000`), sent
+**UPPERCASE EXACTLY** over MQTT -- the device rejects anything else.
+`app/mqtt_client.py:build_payload()` is the single place that builds and
+force-uppercases the final string, so nothing upstream of it (the UI, the
+scheduler) needs to worry about casing.
 
 Everything in `profiles/device_commands.json` becomes a button in the UI
-automatically -- no frontend code changes needed to add a new effect:
+automatically -- no frontend code changes needed to add or adjust a command:
 
 ```json
-{
-  "id": "chase",
-  "label": "Chase",
-  "params": [
-    { "name": "color", "type": "color", "default": "#3B8BD4" },
-    { "name": "speed_ms", "type": "slider", "min": 10, "max": 1000, "default": 120 }
-  ]
-}
+{ "id": "BRI", "label": "Brightness", "value_type": "slider", "min": 0, "max": 100, "default": 70, "unit": "%" }
 ```
 
-Supported param types right now: `color`, `slider` (needs `min`/`max`), and a
-plain text fallback for anything else. When a command fires, the target
-device receives:
+Supported `value_type`s: `slider`, `number`, `hex_color` (color picker,
+`#` stripped automatically), `toggle` (renders 0/1), and `none` (no input --
+`INV`, `AUT`, `STA`). A `fixed_value` field (used for `NET`) skips the input
+entirely and always sends that exact value; pair it with `"confirm": true` +
+`"confirm_text"` to force a confirmation dialog before sending.
 
-```json
-{ "command": "chase", "args": { "color": "#3b8bd4", "speed_ms": 120 } }
-```
+**Known gaps worth closing once you have more info from the client:**
+- `FRM`'s `min`/`max` in the profile is a placeholder (`min: 1`, no `max`)
+  -- update it once you know how many frames are loaded on the device.
+- `BLK`/`ROT` have no upper bound in the profile since the guide doesn't
+  specify one; the device will reject out-of-range values regardless, so
+  this is just about UI friendliness, not correctness.
 
-on the configured `command_topic`.
+**Things this app deliberately does NOT do**, per the guide:
+- **SMS backup channel.** The device also accepts commands via SMS as a
+  no-internet fallback, and sends status notifications to two authorized
+  phone numbers. That's independent of this app and not wired in here --
+  worth asking the client whether they want SMS visibility in the UI too
+  (e.g. showing the same notifications this app can't see).
+- **`NET1`.** Only sendable via SMS by design (the device is offline from
+  MQTT's perspective once `NET0` is sent), so it isn't exposed in the
+  command profile at all -- only `NET0` is, gated behind a confirmation
+  dialog since it's a one-way door from this app's perspective.
+- **Public broker, no auth.** `broker.hivemq.com` has no username/password,
+  so anyone who knows the topic name can publish to it -- the device's own
+  input validation is the real safety net, not the broker. Worth knowing if
+  the client ever asks "who else can control this."
+- **Client ID collision.** The device's own MQTT client ID is
+  `columna-master` -- this app's config uses a different one
+  (`led-kiosk-controller`) on purpose. Don't change it to match the
+  device's, or one of the two will get disconnected by the broker.
 
 ## Deploying to the Pi (outline)
 
@@ -87,12 +109,14 @@ on the configured `command_topic`.
 
 ## Not yet built (intentionally)
 
-- **LoRa transport.** `mqtt_client.publish_command()` is the single choke
-  point every command goes through. Adding LoRa later means writing a
-  sibling `lora_client.publish_command()` with the same signature and a way
-  to pick the transport per-command (or a fallback: try MQTT, fall back to
-  LoRa if the broker's unreachable) -- no changes needed to the UI, the
-  profile schema, or the scheduler.
+- **LoRa transport.** `mqtt_client.publish_command(command_id, value)` is the
+  single choke point every command goes through, and `build_payload()`
+  already produces the exact wire string (`"FRM5"`) independent of MQTT --
+  so adding LoRa later is mostly a sibling `lora_client.publish_command()`
+  that reuses `build_payload()` and sends the same string over the radio
+  module instead, plus a way to pick the transport per-command (or a
+  fallback: try MQTT, fall back to LoRa if the broker's unreachable). No
+  changes needed to the UI, the profile schema, or the scheduler.
 - **Auth.** There's no login on the API/UI. Fine on an isolated kiosk device;
   add something before exposing this beyond localhost.
 - **A7600 AT-command integration.** Connectivity is handled at the OS level

@@ -20,19 +20,19 @@ logger = logging.getLogger("scheduler")
 scheduler = BackgroundScheduler()
 
 
-def _run_job(schedule_id: int, command_id: str, args: dict):
-    ok = publish_command(command_id, args)
+def _run_job(schedule_id: int, command_id: str, value):
+    ok = publish_command(command_id, value)
     db.mark_schedule(schedule_id, "sent" if ok else "failed")
     logger.info("Scheduled command %s (%s) -> %s", schedule_id, command_id, "sent" if ok else "failed")
 
 
-def add_scheduled_command(command_id: str, args: dict, run_at: datetime) -> int:
-    schedule_id = db.insert_schedule(command_id, json.dumps(args), run_at.timestamp())
+def add_scheduled_command(command_id: str, value, run_at: datetime) -> int:
+    schedule_id = db.insert_schedule(command_id, json.dumps(value), run_at.timestamp())
     scheduler.add_job(
         _run_job,
         "date",
         run_date=run_at,
-        args=[schedule_id, command_id, args],
+        args=[schedule_id, command_id, value],
         id=str(schedule_id),
         misfire_grace_time=3600,
     )
@@ -62,7 +62,7 @@ def _rearm_pending():
             _run_job,
             "date",
             run_date=datetime.fromtimestamp(row["run_at"]),
-            args=[row["id"], row["command_id"], json.loads(row["args_json"])],
+            args=[row["id"], row["command_id"], json.loads(row["value_json"])],
             id=str(row["id"]),
             misfire_grace_time=3600,
         )

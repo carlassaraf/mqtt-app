@@ -1,12 +1,12 @@
 {
   "mqtt": {
-    "host": "192.168.1.50",
+    "host": "broker.hivemq.com",
     "port": 1883,
     "client_id": "led-kiosk-controller",
     "username": null,
     "password": null,
-    "log_topic": "device/led-strip/log",
-    "command_topic": "device/led-strip/command",
+    "log_topic": "columna/log",
+    "command_topic": "columna/led",
     "qos": 1
   },
   "app": {

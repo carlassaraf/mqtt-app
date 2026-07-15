@@ -10,7 +10,6 @@ loop, so we hop into the loop with call_soon_threadsafe when we need to
 push a message to websocket subscribers.
 """
 import asyncio
-import json
 import logging
 
 import paho.mqtt.client as mqtt
@@ -95,12 +94,31 @@ def stop():
         _client.disconnect()
 
 
-def publish_command(command_id: str, args: dict) -> bool:
+def build_payload(command_id: str, value=None) -> str:
+    """
+    Builds the device's wire format: 3 letters + value, no separators,
+    e.g. FRM5, BRI70, PPCFF0000, or just INV/AUT/STA with no value.
+    The device requires this UPPERCASE EXACTLY over MQTT (SMS is
+    case-insensitive, but that path isn't handled by this app), so the
+    whole string is forced uppercase here regardless of how the UI/caller
+    sent it -- callers never need to worry about casing.
+    """
+    command_id = command_id.strip().upper()
+    if value is None or value == "":
+        return command_id
+    value_str = str(value)
+    if value_str.startswith("#"):  # hex colors from <input type="color">
+        value_str = value_str[1:]
+    return f"{command_id}{value_str}".upper()
+
+
+def publish_command(command_id: str, value=None) -> bool:
     if _client is None or not _connected:
         logger.error("Cannot publish, MQTT not connected")
         return False
-    payload = json.dumps({"command": command_id, "args": args})
+    payload = build_payload(command_id, value)
     result = _client.publish(
         MQTT_CFG["command_topic"], payload, qos=MQTT_CFG.get("qos", 1)
     )
+    logger.info("Published command: %s", payload)
     return result.rc == mqtt.MQTT_ERR_SUCCESS

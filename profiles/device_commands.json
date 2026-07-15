@@ -1,46 +1,78 @@
 {
-  "device_name": "LED strip controller",
+  "device_name": "Columna RGB",
+  "notes": "Commands are 3 letters + value, no separators, sent UPPERCASE over MQTT (e.g. FRM5, BRI70, PPCFF0000). The backend builds and uppercases the final string -- the UI only needs to collect the value.",
   "commands": [
     {
-      "id": "solid_color",
-      "label": "Solid color",
-      "icon": "ti-square-rounded",
-      "params": [
-        { "name": "color", "type": "color", "default": "#D97757" },
-        { "name": "brightness", "type": "slider", "min": 0, "max": 255, "default": 180 }
-      ]
+      "id": "FRM",
+      "label": "Show frame",
+      "value_type": "number",
+      "min": 1,
+      "note": "Update 'min'/'max' once you know how many frames are loaded on the device."
     },
     {
-      "id": "chase",
-      "label": "Chase",
-      "icon": "ti-arrow-right",
-      "params": [
-        { "name": "color", "type": "color", "default": "#3B8BD4" },
-        { "name": "speed_ms", "type": "slider", "min": 10, "max": 1000, "default": 120 }
-      ]
+      "id": "BRI",
+      "label": "Brightness",
+      "value_type": "slider",
+      "min": 0,
+      "max": 100,
+      "default": 70,
+      "unit": "%"
     },
     {
-      "id": "rainbow",
-      "label": "Rainbow cycle",
-      "icon": "ti-rainbow",
-      "params": [
-        { "name": "speed_ms", "type": "slider", "min": 10, "max": 1000, "default": 200 }
-      ]
+      "id": "BLK",
+      "label": "Blink",
+      "value_type": "number",
+      "min": 0,
+      "unit": "ms",
+      "note": "0 = off"
     },
     {
-      "id": "pulse",
-      "label": "Pulse",
-      "icon": "ti-heart-rate-monitor",
-      "params": [
-        { "name": "color", "type": "color", "default": "#E85D24" },
-        { "name": "period_ms", "type": "slider", "min": 200, "max": 5000, "default": 1500 }
-      ]
+      "id": "ROT",
+      "label": "Rotation speed",
+      "value_type": "number",
+      "min": 0,
+      "unit": "ms",
+      "note": "0 = off (marquee effect)"
     },
     {
-      "id": "off",
-      "label": "Off",
-      "icon": "ti-power",
-      "params": []
+      "id": "INV",
+      "label": "Invert rotation direction",
+      "value_type": "none"
+    },
+    {
+      "id": "AUT",
+      "label": "Resume automatic mode",
+      "value_type": "none"
+    },
+    {
+      "id": "STA",
+      "label": "Request status",
+      "value_type": "none"
+    },
+    {
+      "id": "PPG",
+      "label": "Ping-pong mode",
+      "value_type": "toggle"
+    },
+    {
+      "id": "PPC",
+      "label": "Ping-pong ball color",
+      "value_type": "hex_color",
+      "default": "#FF0000"
+    },
+    {
+      "id": "PPK",
+      "label": "Ping-pong background color",
+      "value_type": "hex_color",
+      "default": "#0000FF"
+    },
+    {
+      "id": "NET",
+      "label": "Disable network (SMS-only afterward)",
+      "value_type": "none",
+      "fixed_value": "0",
+      "confirm": true,
+      "confirm_text": "This disables MQTT on the device immediately. It can only be re-enabled by sending NET1 via SMS from an authorized phone -- not from this app. Continue?"
     }
   ]
 }

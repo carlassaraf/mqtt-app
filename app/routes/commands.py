@@ -20,7 +20,7 @@ def get_command_profile():
 def send_command(req: SendCommandRequest):
     if not is_connected():
         raise HTTPException(503, "MQTT broker not connected")
-    ok = publish_command(req.command_id, req.args)
+    ok = publish_command(req.command_id, req.value)
     if not ok:
         raise HTTPException(500, "Failed to publish command")
-    return {"status": "sent", "command_id": req.command_id, "args": req.args}
+    return {"status": "sent", "command_id": req.command_id, "value": req.value}

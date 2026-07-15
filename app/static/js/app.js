@@ -1,5 +1,10 @@
 // LED kiosk frontend. Vanilla JS on purpose -- one file, no build step,
 // easy to tweak directly on the Pi if needed.
+//
+// Wire protocol reminder: each command is a single 3-letter code plus at
+// most one value (number, hex color, or 0/1 toggle) -- never a list of
+// params. The backend builds the final "FRM5"-style string; this file just
+// collects one value per command and posts { command_id, value }.
 
 let profile = null;
 
@@ -29,48 +34,76 @@ async function pollStatus() {
 setInterval(pollStatus, 4000);
 pollStatus();
 
-// ---------- param rendering (shared by command sheet + schedule form) ----------
-function renderParamField(param) {
+// ---------- single-value field rendering (shared by command sheet + schedule form) ----------
+// Returns { el, getValue } or null if the command takes no value at all
+// (value_type "none" with no fixed_value -- e.g. INV, AUT, STA).
+function renderValueField(cmd) {
+  if (cmd.fixed_value !== undefined) {
+    const note = document.createElement("p");
+    note.className = "meta";
+    note.textContent = `Sends ${cmd.id}${cmd.fixed_value} -- no input needed.`;
+    return { el: note, getValue: () => null }; // caller uses cmd.fixed_value directly, not this
+  }
+
+  if (cmd.value_type === "none") return null;
+
   const wrap = document.createElement("div");
   const label = document.createElement("label");
-  label.textContent = param.name.replace(/_/g, " ");
+  label.textContent = cmd.unit ? `value (${cmd.unit})` : "value";
   wrap.appendChild(label);
 
-  let input;
-  if (param.type === "color") {
-    input = document.createElement("input");
-    input.type = "color";
-    input.value = param.default || "#ffffff";
-  } else if (param.type === "slider") {
-    input = document.createElement("input");
+  if (cmd.value_type === "slider") {
+    const input = document.createElement("input");
     input.type = "range";
-    input.min = param.min; input.max = param.max;
-    input.value = param.default ?? param.min;
+    input.min = cmd.min; input.max = cmd.max;
+    input.value = cmd.default ?? cmd.min;
     const readout = document.createElement("span");
     readout.className = "meta";
     readout.textContent = input.value;
     input.addEventListener("input", () => (readout.textContent = input.value));
     wrap.appendChild(input);
     wrap.appendChild(readout);
-    input.dataset.name = param.name;
-    return { el: wrap, input };
-  } else {
-    input = document.createElement("input");
-    input.type = "text";
-    input.value = param.default ?? "";
+    return { el: wrap, getValue: () => Number(input.value) };
   }
-  input.dataset.name = param.name;
-  wrap.appendChild(input);
-  return { el: wrap, input };
-}
 
-function collectArgs(inputs) {
-  const args = {};
-  for (const input of inputs) {
-    const v = input.type === "range" || input.type === "number" ? Number(input.value) : input.value;
-    args[input.dataset.name] = v;
+  if (cmd.value_type === "number") {
+    const input = document.createElement("input");
+    input.type = "number";
+    if (cmd.min !== undefined) input.min = cmd.min;
+    if (cmd.max !== undefined) input.max = cmd.max;
+    input.value = cmd.default ?? cmd.min ?? 0;
+    wrap.appendChild(input);
+    if (cmd.note) {
+      const note = document.createElement("span");
+      note.className = "meta";
+      note.textContent = cmd.note;
+      wrap.appendChild(note);
+    }
+    return { el: wrap, getValue: () => Number(input.value) };
   }
-  return args;
+
+  if (cmd.value_type === "hex_color") {
+    const input = document.createElement("input");
+    input.type = "color";
+    input.value = cmd.default ?? "#ffffff";
+    wrap.appendChild(input);
+    // device wants hex WITHOUT '#' -- backend also strips it defensively,
+    // but send it clean from here too
+    return { el: wrap, getValue: () => input.value.replace("#", "") };
+  }
+
+  if (cmd.value_type === "toggle") {
+    const select = document.createElement("select");
+    select.innerHTML = `<option value="1">On (1)</option><option value="0">Off (0)</option>`;
+    wrap.appendChild(select);
+    return { el: wrap, getValue: () => Number(select.value) };
+  }
+
+  // fallback: plain text
+  const input = document.createElement("input");
+  input.type = "text";
+  wrap.appendChild(input);
+  return { el: wrap, getValue: () => input.value };
 }
 
 // ---------- commands tab ----------
@@ -82,7 +115,7 @@ async function loadProfile() {
   for (const cmd of profile.commands) {
     const card = document.createElement("div");
     card.className = "command-card";
-    card.innerHTML = `<span class="command-glyph">${cmd.label[0]}</span><span>${cmd.label}</span>`;
+    card.innerHTML = `<span class="command-glyph">${cmd.id[0]}</span><span>${cmd.label}</span>`;
     card.addEventListener("click", () => openCommandSheet(cmd));
     grid.appendChild(card);
   }
@@ -104,24 +137,31 @@ function openCommandSheet(cmd) {
   h2.textContent = cmd.label;
   sheet.appendChild(h2);
 
-  const inputs = [];
-  for (const param of cmd.params) {
-    const { el, input } = renderParamField(param);
-    sheet.appendChild(el);
-    inputs.push(input);
-  }
+  const code = document.createElement("p");
+  code.className = "meta";
+  code.textContent = `Command code: ${cmd.id}`;
+  sheet.appendChild(code);
+
+  const field = renderValueField(cmd);
+  if (field) sheet.appendChild(field.el);
 
   const sendBtn = document.createElement("button");
   sendBtn.className = "primary";
   sendBtn.textContent = "Send command";
   sendBtn.addEventListener("click", async () => {
+    if (cmd.confirm && !confirm(cmd.confirm_text || "Are you sure?")) return;
+
+    const value = cmd.fixed_value !== undefined
+      ? cmd.fixed_value
+      : (field ? field.getValue() : null);
+
     sendBtn.disabled = true;
     sendBtn.textContent = "Sending…";
     try {
       const res = await fetch("/api/commands/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ command_id: cmd.id, args: collectArgs(inputs) }),
+        body: JSON.stringify({ command_id: cmd.id, value }),
       });
       sendBtn.textContent = res.ok ? "Sent" : "Failed";
     } catch {
@@ -143,7 +183,8 @@ function appendLogLine(msg) {
   const line = document.createElement("div");
   line.className = "log-line";
   const ts = new Date().toLocaleTimeString();
-  line.innerHTML = `<span class="ts">${ts}</span><span class="topic">${msg.topic}</span><span class="payload">${msg.payload}</span>`;
+  line.innerHTML = `<span class="ts">${ts}</span><span class="topic">${msg.topic}</span><span class="payload"></span>`;
+  line.querySelector(".payload").textContent = msg.payload; // textContent, not innerHTML: payload is untrusted device data
   view.appendChild(line);
   view.scrollTop = view.scrollHeight;
 }
@@ -172,27 +213,23 @@ function populateScheduleCommandSelect() {
   for (const cmd of profile.commands) {
     const opt = document.createElement("option");
     opt.value = cmd.id;
-    opt.textContent = cmd.label;
+    opt.textContent = `${cmd.label} (${cmd.id})`;
     select.appendChild(opt);
   }
   form.appendChild(select);
 
-  const paramContainer = document.createElement("div");
-  form.appendChild(paramContainer);
+  const fieldContainer = document.createElement("div");
+  form.appendChild(fieldContainer);
 
-  let currentInputs = [];
-  function renderParams() {
-    paramContainer.innerHTML = "";
-    currentInputs = [];
+  let currentField = null;
+  function renderField() {
+    fieldContainer.innerHTML = "";
     const cmd = profile.commands.find((c) => c.id === select.value);
-    for (const param of cmd.params) {
-      const { el, input } = renderParamField(param);
-      paramContainer.appendChild(el);
-      currentInputs.push(input);
-    }
+    currentField = renderValueField(cmd);
+    if (currentField) fieldContainer.appendChild(currentField.el);
   }
-  select.addEventListener("change", renderParams);
-  renderParams();
+  select.addEventListener("change", renderField);
+  renderField();
 
   const dtLabel = document.createElement("label");
   dtLabel.textContent = "run at";
@@ -206,14 +243,14 @@ function populateScheduleCommandSelect() {
   addBtn.textContent = "Schedule command";
   addBtn.addEventListener("click", async () => {
     if (!dtInput.value) return;
+    const cmd = profile.commands.find((c) => c.id === select.value);
+    const value = cmd.fixed_value !== undefined
+      ? cmd.fixed_value
+      : (currentField ? currentField.getValue() : null);
     await fetch("/api/schedule", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        command_id: select.value,
-        args: collectArgs(currentInputs),
-        run_at: dtInput.value,
-      }),
+      body: JSON.stringify({ command_id: select.value, value, run_at: dtInput.value }),
     });
     loadSchedules();
   });
