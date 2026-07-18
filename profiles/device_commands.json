@@ -7,7 +7,7 @@
       "label": "Mostrar cuadro",
       "value_type": "number",
       "min": 1,
-      "note": "Actualizar 'min'/'max' cuando se sepa cuántos cuadros hay cargados en el dispositivo."
+      "max": 22
     },
     {
       "id": "BRI",
