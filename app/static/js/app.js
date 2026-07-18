@@ -19,13 +19,16 @@ document.querySelectorAll(".tab").forEach((btn) => {
 });
 
 // ---------- connectivity status ----------
+const NETWORK_LABELS = { wifi: "WiFi", lte: "LTE", ethernet: "Ethernet" };
+
 async function pollStatus() {
   try {
     const res = await fetch("/api/status");
     const data = await res.json();
     document.getElementById("statusDot").classList.toggle("connected", data.mqtt_connected);
-    document.getElementById("statusText").textContent = data.mqtt_connected
-      ? "broker conectado" : "broker desconectado";
+    const base = data.mqtt_connected ? "broker conectado" : "broker desconectado";
+    const netLabel = NETWORK_LABELS[data.network_type];
+    document.getElementById("statusText").textContent = netLabel ? `${base} · ${netLabel}` : base;
   } catch {
     document.getElementById("statusDot").classList.remove("connected");
     document.getElementById("statusText").textContent = "app sin conexión";

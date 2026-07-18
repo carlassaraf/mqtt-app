@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app import db, mqtt_client, scheduler
+from app import db, mqtt_client, network_status, scheduler
 from app.routes import commands, logs, schedule
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -38,7 +38,10 @@ async def shutdown():
 @app.get("/api/status")
 def status():
     """Polled by the frontend to show a connectivity indicator."""
-    return {"mqtt_connected": mqtt_client.is_connected()}
+    return {
+        "mqtt_connected": mqtt_client.is_connected(),
+        "network_type": network_status.get_active_interface()["type"],
+    }
 
 
 @app.get("/", response_class=HTMLResponse)
