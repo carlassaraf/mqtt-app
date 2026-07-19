@@ -95,6 +95,27 @@ function renderValueField(cmd) {
     return { el: wrap, getValue: () => input.value.replace("#", "") };
   }
 
+  if (cmd.value_type === "hex_color_triple") {
+    // SCL wants 3 back-to-back RRGGBB values (no separators, no '#'), one per strip
+    const defaults = cmd.defaults || ["#FFFFFF", "#FFFFFF", "#FFFFFF"];
+    const inputs = defaults.map((def, i) => {
+      const row = document.createElement("div");
+      const rowLabel = document.createElement("label");
+      rowLabel.textContent = `tira ${i + 1}`;
+      row.appendChild(rowLabel);
+      const input = document.createElement("input");
+      input.type = "color";
+      input.value = def;
+      row.appendChild(input);
+      wrap.appendChild(row);
+      return input;
+    });
+    return {
+      el: wrap,
+      getValue: () => inputs.map((input) => input.value.replace("#", "")).join("").toUpperCase(),
+    };
+  }
+
   if (cmd.value_type === "toggle") {
     const select = document.createElement("select");
     select.innerHTML = `<option value="1">Encendido (1)</option><option value="0">Apagado (0)</option>`;

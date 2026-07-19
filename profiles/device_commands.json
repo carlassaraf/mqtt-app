@@ -67,6 +67,17 @@
       "default": "#0000FF"
     },
     {
+      "id": "SCR",
+      "label": "Modo rotación de color por tira",
+      "value_type": "toggle"
+    },
+    {
+      "id": "SCL",
+      "label": "Colores de las tiras",
+      "value_type": "hex_color_triple",
+      "defaults": ["#FF0000", "#00FF00", "#0000FF"]
+    },
+    {
       "id": "NET",
       "label": "Deshabilitar red (solo SMS después)",
       "value_type": "none",
