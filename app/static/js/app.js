@@ -209,8 +209,8 @@ function appendLogLine(msg) {
   const ts = new Date().toLocaleTimeString();
   line.innerHTML = `<span class="ts">${ts}</span><span class="topic">${msg.topic}</span><span class="payload"></span>`;
   line.querySelector(".payload").textContent = msg.payload; // textContent, not innerHTML: payload is untrusted device data
-  view.appendChild(line);
-  view.scrollTop = view.scrollHeight;
+  view.insertBefore(line, view.firstChild); // newest on top
+  view.scrollTop = 0;
 }
 
 async function loadRecentLogs() {
