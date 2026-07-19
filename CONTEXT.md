@@ -104,7 +104,7 @@ app/
   mqtt_client.py        paho-mqtt wrapper + build_payload() + websocket fan-out
   scheduler.py           APScheduler wrapper, sqlite-persisted, re-arms on restart
   network_status.py       reads active default-route interface (wifi/lte/ethernet) for /api/status
-  models.py               SendCommandRequest / ScheduleRequest (command_id + single value)
+  models.py               SendCommandRequest / ScheduleRequest (label + ordered list of commands, i.e. a "state")
   routes/
     commands.py            GET profile, POST send
     logs.py                  GET history, WS live tail (/ws/logs)

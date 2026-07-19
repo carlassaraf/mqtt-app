@@ -20,8 +20,8 @@ CREATE TABLE IF NOT EXISTS logs (
 
 CREATE TABLE IF NOT EXISTS scheduled_commands (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    command_id TEXT NOT NULL,
-    value_json TEXT NOT NULL,
+    label TEXT NOT NULL,
+    commands_json TEXT NOT NULL,
     run_at REAL NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
     created_at REAL NOT NULL
@@ -40,8 +40,19 @@ def get_conn():
         conn.close()
 
 
+def _migrate_legacy_schedule_table(conn):
+    """Schedules used to be one command_id/value_json per row. That shape can't
+    represent a multi-command state trigger, so on upgrade we drop any rows in
+    the old shape rather than shoehorn them in -- they're trivially re-created
+    in the new schedule UI, and this only ever touches not-yet-fired rows."""
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(scheduled_commands)")}
+    if cols and "label" not in cols:
+        conn.execute("DROP TABLE scheduled_commands")
+
+
 def init_db():
     with get_conn() as conn:
+        _migrate_legacy_schedule_table(conn)
         conn.executescript(SCHEMA)
 
 
@@ -61,12 +72,12 @@ def get_recent_logs(limit: int = 200):
     return [dict(r) for r in reversed(rows)]
 
 
-def insert_schedule(command_id: str, value_json: str, run_at: float) -> int:
+def insert_schedule(label: str, commands_json: str, run_at: float) -> int:
     with get_conn() as conn:
         cur = conn.execute(
-            "INSERT INTO scheduled_commands (command_id, value_json, run_at, created_at) "
+            "INSERT INTO scheduled_commands (label, commands_json, run_at, created_at) "
             "VALUES (?, ?, ?, ?)",
-            (command_id, value_json, run_at, time.time()),
+            (label, commands_json, run_at, time.time()),
         )
         return cur.lastrowid
 

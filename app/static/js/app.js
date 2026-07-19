@@ -143,7 +143,7 @@ async function loadProfile() {
     card.addEventListener("click", () => openCommandSheet(cmd));
     grid.appendChild(card);
   }
-  populateScheduleCommandSelect();
+  renderScheduleForm();
 }
 
 function openCommandSheet(cmd) {
@@ -228,53 +228,145 @@ function connectLogSocket() {
   ws.onclose = () => setTimeout(connectLogSocket, 2000); // simple reconnect
 }
 
-// ---------- schedule tab ----------
-function populateScheduleCommandSelect() {
+// ---------- schedule tab: trigger a whole visual "state" at a future time ----------
+// Unlike the Comandos tab (one raw command at a time), this bundles several
+// commands that together define one coherent state. Every state leads with
+// AUT to clear whichever mode the device was previously left in -- PPG1/SCR1
+// don't clear each other or a paused frame, only AUT does (see the firmware's
+// ARCHITECTURE.md Â§4.1/Â§4.1.1/Â§4.1.2) -- otherwise a scheduled "frame" state
+// could still render as ping-pong if that mode was left on from an earlier
+// manual command. NET/STA/AUT/CON/DIS aren't states, so they're not offered here.
+function getCmd(id) {
+  return profile.commands.find((c) => c.id === id);
+}
+
+function appendField(container, cmd) {
+  const field = renderValueField(cmd);
+  container.appendChild(field.el);
+  return field;
+}
+
+const SCHEDULE_STATES = {
+  frame: {
+    label: "Cuadro",
+    fields(container) {
+      const frm = appendField(container, getCmd("FRM"));
+
+      const invRow = document.createElement("div");
+      invRow.className = "checkbox-row";
+      const invLabel = document.createElement("label");
+      invLabel.textContent = "Invertir dirección de rotación";
+      const invCheckbox = document.createElement("input");
+      invCheckbox.type = "checkbox";
+      invRow.appendChild(invLabel);
+      invRow.appendChild(invCheckbox);
+      container.appendChild(invRow);
+
+      const blk = appendField(container, getCmd("BLK"));
+      const rot = appendField(container, getCmd("ROT"));
+
+      return () => {
+        const frame = frm.getValue();
+        const commands = [{ command_id: "AUT" }, { command_id: "FRM", value: frame }];
+        if (invCheckbox.checked) commands.push({ command_id: "INV" });
+        commands.push({ command_id: "BLK", value: blk.getValue() });
+        commands.push({ command_id: "ROT", value: rot.getValue() });
+        return { commands, label: `Cuadro ${frame}${invCheckbox.checked ? " (invertido)" : ""}` };
+      };
+    },
+  },
+  pingpong: {
+    label: "Ping-pong",
+    fields(container) {
+      const ppc = appendField(container, getCmd("PPC"));
+      const ppk = appendField(container, getCmd("PPK"));
+      const rot = appendField(container, getCmd("ROT"));
+      const bri = appendField(container, getCmd("BRI"));
+      const blk = appendField(container, getCmd("BLK"));
+
+      return () => ({
+        commands: [
+          { command_id: "AUT" },
+          { command_id: "PPG", value: 1 },
+          { command_id: "PPC", value: ppc.getValue() },
+          { command_id: "PPK", value: ppk.getValue() },
+          { command_id: "ROT", value: rot.getValue() },
+          { command_id: "BRI", value: bri.getValue() },
+          { command_id: "BLK", value: blk.getValue() },
+        ],
+        label: "Ping-pong",
+      });
+    },
+  },
+  stripcolor: {
+    label: "Rotación de color por tira",
+    fields(container) {
+      const scl = appendField(container, getCmd("SCL"));
+      const rot = appendField(container, getCmd("ROT"));
+      const bri = appendField(container, getCmd("BRI"));
+      const blk = appendField(container, getCmd("BLK"));
+
+      return () => ({
+        commands: [
+          { command_id: "AUT" },
+          { command_id: "SCR", value: 1 },
+          { command_id: "SCL", value: scl.getValue() },
+          { command_id: "ROT", value: rot.getValue() },
+          { command_id: "BRI", value: bri.getValue() },
+          { command_id: "BLK", value: blk.getValue() },
+        ],
+        label: "Rotación de color por tira",
+      });
+    },
+  },
+};
+
+function renderScheduleForm() {
   const form = document.getElementById("scheduleForm");
   form.innerHTML = "";
 
-  const select = document.createElement("select");
-  for (const cmd of profile.commands) {
+  const typeLabel = document.createElement("label");
+  typeLabel.textContent = "tipo de estado";
+  form.appendChild(typeLabel);
+
+  const typeSelect = document.createElement("select");
+  for (const [key, def] of Object.entries(SCHEDULE_STATES)) {
     const opt = document.createElement("option");
-    opt.value = cmd.id;
-    opt.textContent = `${cmd.label} (${cmd.id})`;
-    select.appendChild(opt);
+    opt.value = key;
+    opt.textContent = def.label;
+    typeSelect.appendChild(opt);
   }
-  form.appendChild(select);
+  form.appendChild(typeSelect);
 
   const fieldContainer = document.createElement("div");
   form.appendChild(fieldContainer);
 
-  let currentField = null;
-  function renderField() {
+  let collect = null;
+  function renderFields() {
     fieldContainer.innerHTML = "";
-    const cmd = profile.commands.find((c) => c.id === select.value);
-    currentField = renderValueField(cmd);
-    if (currentField) fieldContainer.appendChild(currentField.el);
+    collect = SCHEDULE_STATES[typeSelect.value].fields(fieldContainer);
   }
-  select.addEventListener("change", renderField);
-  renderField();
+  typeSelect.addEventListener("change", renderFields);
+  renderFields();
 
   const dtLabel = document.createElement("label");
   dtLabel.textContent = "ejecutar el";
   form.appendChild(dtLabel);
   const dtInput = document.createElement("input");
   dtInput.type = "datetime-local";
+  dtInput.className = "schedule-datetime";
   form.appendChild(dtInput);
 
   const addBtn = document.createElement("button");
   addBtn.className = "primary";
-  addBtn.textContent = "Programar comando";
+  addBtn.textContent = "Programar estado";
   addBtn.addEventListener("click", async () => {
     if (!dtInput.value) return;
-    const cmd = profile.commands.find((c) => c.id === select.value);
-    const value = cmd.fixed_value !== undefined
-      ? cmd.fixed_value
-      : (currentField ? currentField.getValue() : null);
+    const { commands, label } = collect();
     await fetch("/api/schedule", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ command_id: select.value, value, run_at: dtInput.value }),
+      body: JSON.stringify({ label, commands, run_at: dtInput.value }),
     });
     loadSchedules();
   });
@@ -292,7 +384,7 @@ async function loadSchedules() {
     const when = new Date(row.run_at * 1000).toLocaleString();
     item.innerHTML = `
       <div>
-        <div>${row.command_id}</div>
+        <div>${row.label}</div>
         <div class="meta">${when} · ${row.status}</div>
       </div>
       <button class="btn-cancel">Cancelar</button>`;

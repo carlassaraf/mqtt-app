@@ -20,19 +20,25 @@ logger = logging.getLogger("scheduler")
 scheduler = BackgroundScheduler()
 
 
-def _run_job(schedule_id: int, command_id: str, value):
-    ok = publish_command(command_id, value)
-    db.mark_schedule(schedule_id, "sent" if ok else "failed")
-    logger.info("Scheduled command %s (%s) -> %s", schedule_id, command_id, "sent" if ok else "failed")
+def _run_job(schedule_id: int, commands: list[dict]):
+    """Fires every command in the state, in order. One failed publish doesn't
+    stop the rest from going out -- but the row is marked 'failed' overall if
+    any of them didn't make it, since the resulting state may be incomplete."""
+    all_ok = True
+    for cmd in commands:
+        ok = publish_command(cmd["command_id"], cmd.get("value"))
+        all_ok = all_ok and ok
+    db.mark_schedule(schedule_id, "sent" if all_ok else "failed")
+    logger.info("Scheduled state %s (%d commands) -> %s", schedule_id, len(commands), "sent" if all_ok else "failed")
 
 
-def add_scheduled_command(command_id: str, value, run_at: datetime) -> int:
-    schedule_id = db.insert_schedule(command_id, json.dumps(value), run_at.timestamp())
+def add_scheduled_command(label: str, commands: list[dict], run_at: datetime) -> int:
+    schedule_id = db.insert_schedule(label, json.dumps(commands), run_at.timestamp())
     scheduler.add_job(
         _run_job,
         "date",
         run_date=run_at,
-        args=[schedule_id, command_id, value],
+        args=[schedule_id, commands],
         id=str(schedule_id),
         misfire_grace_time=3600,
     )
@@ -62,7 +68,7 @@ def _rearm_pending():
             _run_job,
             "date",
             run_date=datetime.fromtimestamp(row["run_at"]),
-            args=[row["id"], row["command_id"], json.loads(row["value_json"])],
+            args=[row["id"], json.loads(row["commands_json"])],
             id=str(row["id"]),
             misfire_grace_time=3600,
         )
