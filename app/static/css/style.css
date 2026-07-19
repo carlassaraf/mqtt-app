@@ -51,28 +51,28 @@ main { padding: 24px 28px 100px; height: calc(100vh - 130px); overflow-y: auto; 
 /* ---- Commands ---- */
 .command-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(315px, 1fr));
+  gap: 30px;
 }
 .command-card {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 28px 20px; min-height: 140px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  padding: 42px 30px; min-height: 210px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 21px;
   cursor: pointer; text-align: center;
 }
 .command-card:active { background: var(--surface-2); border-color: var(--accent); }
 .command-glyph {
-  width: 56px; height: 56px; border-radius: 50%; background: var(--accent-dim);
-  color: var(--accent); font-size: 24px; font-weight: 600;
+  width: 84px; height: 84px; border-radius: 50%; background: var(--accent-dim);
+  color: var(--accent); font-size: 36px; font-weight: 600;
   display: flex; align-items: center; justify-content: center;
 }
-.command-card span:not(.command-glyph) { font-size: 18px; font-weight: 500; }
+.command-card span:not(.command-glyph) { font-size: 27px; font-weight: 500; }
 
 /* ---- Log ---- */
 .log-view {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
   padding: 16px 18px; height: 100%;
-  font-family: var(--font-mono); font-size: 13px; line-height: 1.6;
+  font-family: var(--font-mono); font-size: 26px; line-height: 1.6;
   overflow-y: auto; white-space: pre-wrap;
 }
 .log-line { display: flex; gap: 12px; border-bottom: 1px solid var(--border); padding: 4px 0; }
@@ -98,15 +98,15 @@ main { padding: 24px 28px 100px; height: calc(100vh - 130px); overflow-y: auto; 
 }
 
 /* ---- Shared form controls (touch-sized) ---- */
-label { display: block; font-size: 13px; color: var(--text-dim); margin: 14px 0 6px; }
-input[type="range"] { width: 100%; height: 40px; accent-color: var(--accent); }
-input[type="color"] { width: 100%; height: 48px; border: 1px solid var(--border); border-radius: 10px; background: none; }
+label { display: block; font-size: 20px; color: var(--text-dim); margin: 21px 0 9px; }
+input[type="range"] { width: 100%; height: 60px; accent-color: var(--accent); }
+input[type="color"] { width: 100%; height: 72px; border: 1px solid var(--border); border-radius: 10px; background: none; }
 select, input[type="datetime-local"], input[type="number"] {
-  width: 100%; padding: 12px 14px; font-size: 15px;
+  width: 100%; padding: 18px 21px; font-size: 23px;
   background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 10px;
 }
 button.primary {
-  width: 100%; margin-top: 20px; padding: 16px; font-size: 16px; font-weight: 600;
+  width: 100%; margin-top: 30px; padding: 24px; font-size: 24px; font-weight: 600;
   background: var(--accent); color: #06231f; border: none; border-radius: 10px; cursor: pointer;
 }
 button.primary:disabled { opacity: .5; }
@@ -119,10 +119,10 @@ button.primary:disabled { opacity: .5; }
 .sheet-backdrop.open { display: flex; }
 .sheet {
   background: var(--surface); border-radius: 20px 20px 0 0; border: 1px solid var(--border);
-  width: 100%; max-width: 520px; padding: 24px 24px 32px; max-height: 80vh; overflow-y: auto;
+  width: 100%; max-width: 780px; padding: 36px 36px 48px; max-height: 80vh; overflow-y: auto;
 }
-.sheet h2 { margin: 0 0 4px; font-size: 18px; }
+.sheet h2 { margin: 0 0 6px; font-size: 27px; }
 .sheet .close-row { display: flex; justify-content: flex-end; }
 .sheet .close-row button {
-  background: none; border: none; color: var(--text-dim); font-size: 22px; cursor: pointer;
+  background: none; border: none; color: var(--text-dim); font-size: 33px; cursor: pointer;
 }
