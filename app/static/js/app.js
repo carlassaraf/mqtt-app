@@ -96,23 +96,41 @@ function renderValueField(cmd) {
   }
 
   if (cmd.value_type === "hex_color_triple") {
-    // SCL wants 3 back-to-back RRGGBB values (no separators, no '#'), one per strip
+    // SCL wants 3 back-to-back RRGGBB values (no separators, no '#'), one per strip.
+    // Palette swatches instead of the native color wheel -- much easier to hit
+    // accurately on a 7" touchscreen than dragging a hue/saturation picker.
     const defaults = cmd.defaults || ["#FFFFFF", "#FFFFFF", "#FFFFFF"];
-    const inputs = defaults.map((def, i) => {
+    const palette = cmd.palette || defaults;
+    const selected = defaults.map((d) => d.toUpperCase());
+
+    defaults.forEach((_, i) => {
       const row = document.createElement("div");
       const rowLabel = document.createElement("label");
       rowLabel.textContent = `tira ${i + 1}`;
       row.appendChild(rowLabel);
-      const input = document.createElement("input");
-      input.type = "color";
-      input.value = def;
-      row.appendChild(input);
+
+      const swatchRow = document.createElement("div");
+      swatchRow.className = "swatch-row";
+      for (const color of palette) {
+        const swatch = document.createElement("button");
+        swatch.type = "button";
+        swatch.className = "swatch";
+        swatch.style.background = color;
+        swatch.classList.toggle("selected", color.toUpperCase() === selected[i]);
+        swatch.addEventListener("click", () => {
+          selected[i] = color.toUpperCase();
+          swatchRow.querySelectorAll(".swatch").forEach((el) => el.classList.remove("selected"));
+          swatch.classList.add("selected");
+        });
+        swatchRow.appendChild(swatch);
+      }
+      row.appendChild(swatchRow);
       wrap.appendChild(row);
-      return input;
     });
+
     return {
       el: wrap,
-      getValue: () => inputs.map((input) => input.value.replace("#", "")).join("").toUpperCase(),
+      getValue: () => selected.map((c) => c.replace("#", "")).join("").toUpperCase(),
     };
   }
 
