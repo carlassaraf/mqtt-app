@@ -4,7 +4,7 @@
   "commands": [
     {
       "id": "FRM",
-      "label": "Mostrar cuadro",
+      "label": "Mostrar escena",
       "value_type": "number",
       "min": 1,
       "max": 22
@@ -81,14 +81,6 @@
         "#FF00FF", "#00FFFF", "#FFFFFF", "#FFA500",
         "#800080", "#000000"
       ]
-    },
-    {
-      "id": "NET",
-      "label": "Deshabilitar red (solo SMS después)",
-      "value_type": "none",
-      "fixed_value": "0",
-      "confirm": true,
-      "confirm_text": "Esto deshabilita MQTT en el dispositivo de inmediato. Solo puede reactivarse enviando NET1 por SMS desde un número autorizado, no desde esta app. ¿Continuar?"
     }
   ]
 }

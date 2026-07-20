@@ -345,7 +345,7 @@ function appendField(container, cmd) {
 
 const SCHEDULE_STATES = {
   frame: {
-    label: "Cuadro",
+    label: "Escena",
     fields(container) {
       const frm = appendField(container, getCmd("FRM"));
 
@@ -368,7 +368,7 @@ const SCHEDULE_STATES = {
         if (invCheckbox.checked) commands.push({ command_id: "INV" });
         commands.push({ command_id: "BLK", value: blk.getValue() });
         commands.push({ command_id: "ROT", value: rot.getValue() });
-        return { commands, label: `Cuadro ${frame}${invCheckbox.checked ? " (invertido)" : ""}` };
+        return { commands, label: `Escena ${frame}${invCheckbox.checked ? " (invertido)" : ""}` };
       };
     },
   },
