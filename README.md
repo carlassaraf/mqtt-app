@@ -26,6 +26,7 @@ kiosk/
   start_kiosk.sh                launches Chromium in kiosk mode
   led-kiosk-backend.service     systemd unit for the FastAPI app
   led-kiosk-browser.service     systemd unit for the kiosk browser
+  led-kiosk-launcher.desktop    manual/alternative desktop icon to (re)launch the kiosk browser
 config.example.json    copy to config.json and fill in your broker details
 ```
 
@@ -106,6 +107,9 @@ entirely and always sends that exact value; pair it with `"confirm": true` +
    Chromium has something to run in, and consider `systemctl mask
    getty@tty2` etc. plus an overlay/read-only root filesystem so the client
    can't corrupt the SD card by power-cycling mid-write.
+7. Optional: install `kiosk/led-kiosk-launcher.desktop` (see its header
+   comment) for a manual desktop icon/menu entry to (re)launch the kiosk
+   browser -- handy if Chromium ever gets closed and you don't want to SSH in.
 
 ## Not yet built (intentionally)
 

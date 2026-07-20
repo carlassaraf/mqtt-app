@@ -1,0 +1,18 @@
+# Manual/alternative way to (re)launch the kiosk browser from the Pi's desktop
+# -- e.g. if Chromium was closed and led-kiosk-browser.service isn't installed
+# or isn't set to restart, or while testing before the systemd services are
+# set up. Assumes led-kiosk-backend is already running (this just launches
+# start_kiosk.sh, same as the browser systemd service does).
+#
+# Install (pick one or both):
+#   Desktop icon:      cp led-kiosk-launcher.desktop ~/Desktop/ && chmod +x ~/Desktop/led-kiosk-launcher.desktop
+#   Applications menu: mkdir -p ~/.local/share/applications && cp led-kiosk-launcher.desktop ~/.local/share/applications/
+[Desktop Entry]
+Type=Application
+Name=Controlador de tira LED
+Comment=Abre el panel de control de la tira LED (modo kiosko)
+Exec=/home/pi/led-kiosk/kiosk/start_kiosk.sh
+Icon=video-display
+Terminal=false
+Categories=Utility;
+StartupNotify=false
