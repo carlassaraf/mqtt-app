@@ -87,6 +87,18 @@ document.addEventListener("focusin", (e) => {
   keypadBackdrop.classList.add("open");
 });
 
+// ---------- close app ----------
+// Chromium runs with --kiosk (no window chrome), so this button is the only
+// way for the client to get back to the Pi's desktop.
+document.getElementById("closeAppBtn").addEventListener("click", async () => {
+  if (!confirm("¿Cerrar la aplicación?")) return;
+  try {
+    await fetch("/api/system/quit-browser", { method: "POST" });
+  } catch {
+    // the fetch itself may never resolve once the browser starts closing -- fine to ignore
+  }
+});
+
 // ---------- connectivity status ----------
 const NETWORK_LABELS = { wifi: "WiFi", lte: "LTE", ethernet: "Ethernet" };
 
@@ -298,14 +310,6 @@ function appendLogLine(msg) {
   line.querySelector(".payload").textContent = msg.payload; // textContent, not innerHTML: payload is untrusted device data
   view.insertBefore(line, view.firstChild); // newest on top
   view.scrollTop = 0;
-}
-
-async function loadRecentLogs() {
-  const res = await fetch("/api/logs?limit=200");
-  const logs = await res.json();
-  for (const row of logs) {
-    appendLogLine({ topic: row.topic, payload: row.payload });
-  }
 }
 
 function connectLogSocket() {
@@ -665,6 +669,6 @@ async function loadSchedules() {
 
 // ---------- boot ----------
 loadProfile();
-loadRecentLogs().then(connectLogSocket);
+connectLogSocket();
 loadSchedules();
 setInterval(loadSchedules, 15000);
