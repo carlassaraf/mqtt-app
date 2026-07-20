@@ -24,9 +24,10 @@ profiles/
   device_commands.json  <-- edit this to add/change LED effects & their params
 kiosk/
   start_kiosk.sh                launches Chromium in kiosk mode
+  launch_app.sh                 starts the backend (if not already running) + start_kiosk.sh
   led-kiosk-backend.service     systemd unit for the FastAPI app
   led-kiosk-browser.service     systemd unit for the kiosk browser
-  led-kiosk-launcher.desktop    manual/alternative desktop icon to (re)launch the kiosk browser
+  led-kiosk-launcher.desktop    one-click desktop icon that runs launch_app.sh
 config.example.json    copy to config.json and fill in your broker details
 ```
 
@@ -107,9 +108,20 @@ entirely and always sends that exact value; pair it with `"confirm": true` +
    Chromium has something to run in, and consider `systemctl mask
    getty@tty2` etc. plus an overlay/read-only root filesystem so the client
    can't corrupt the SD card by power-cycling mid-write.
-7. Optional: install `kiosk/led-kiosk-launcher.desktop` (see its header
-   comment) for a manual desktop icon/menu entry to (re)launch the kiosk
-   browser -- handy if Chromium ever gets closed and you don't want to SSH in.
+7. Optional, for a one-click "just double-click it" experience for the client
+   (starts the backend if it isn't already running, then opens the kiosk
+   browser -- doesn't require the systemd services above to be installed):
+   ```bash
+   chmod +x kiosk/launch_app.sh kiosk/led-kiosk-launcher.desktop
+   cp kiosk/led-kiosk-launcher.desktop ~/Desktop/           # icon on the desktop
+   mkdir -p ~/.local/share/applications
+   cp kiosk/led-kiosk-launcher.desktop ~/.local/share/applications/  # and/or the app menu
+   ```
+   Note: the `.desktop` file intentionally has no comment lines -- PCManFM
+   (Raspberry Pi OS's file manager) rejects `.desktop` files with comments
+   before `[Desktop Entry]` as "Invalid desktop entry file", stricter than
+   the freedesktop spec technically requires. Keep it comment-free if you
+   edit it.
 
 ## Not yet built (intentionally)
 
