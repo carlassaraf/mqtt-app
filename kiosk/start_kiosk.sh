@@ -8,7 +8,16 @@ until curl -s http://127.0.0.1:8000/api/status > /dev/null; do
   sleep 1
 done
 
-exec chromium-browser \
+# Raspberry Pi OS Bookworm renamed the package from chromium-browser to
+# chromium (the old wrapper name isn't shipped anymore); older releases still
+# use chromium-browser. Try both rather than hardcoding one.
+BROWSER_BIN=$(command -v chromium-browser || command -v chromium)
+if [ -z "$BROWSER_BIN" ]; then
+  echo "start_kiosk.sh: no chromium-browser or chromium binary found -- install one with 'sudo apt install chromium'" >&2
+  exit 1
+fi
+
+exec "$BROWSER_BIN" \
   --kiosk \
   --noerrdialogs \
   --disable-infobars \
