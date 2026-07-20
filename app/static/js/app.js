@@ -362,10 +362,15 @@ function pad2(n) {
 
 function createDateTimePicker() {
   const now = new Date();
-  let viewYear = now.getFullYear();
-  let viewMonth = now.getMonth();
-  let selectedDay = null; // { year, month, day }, month is 0-indexed
-  let hour = (now.getHours() + 1) % 24;
+  // Default to "an hour from now" (via a real Date add, so a near-midnight
+  // default correctly rolls over into tomorrow) and pre-select that day --
+  // otherwise the "Programar estado" button had nothing to submit until the
+  // user explicitly tapped a day, and silently did nothing when they didn't.
+  const defaultDt = new Date(now.getTime() + 60 * 60 * 1000);
+  let viewYear = defaultDt.getFullYear();
+  let viewMonth = defaultDt.getMonth();
+  let selectedDay = { year: defaultDt.getFullYear(), month: defaultDt.getMonth(), day: defaultDt.getDate() };
+  let hour = defaultDt.getHours();
   let minute = 0;
 
   const el = document.createElement("div");
