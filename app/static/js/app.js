@@ -18,6 +18,75 @@ document.querySelectorAll(".tab").forEach((btn) => {
   });
 });
 
+// ---------- numeric keypad ----------
+// Chromium in kiosk mode doesn't pop up any on-screen keyboard for number
+// inputs on this device, and every field in this app (frame/blink/rotation/
+// brightness/hour/minute) is numeric anyway, so this covers the whole app
+// without needing a system keyboard package. Delegated on document, so it
+// applies to fields rendered later too (schedule form, time picker, etc).
+const keypadBackdrop = document.createElement("div");
+keypadBackdrop.className = "keypad-backdrop";
+const keypad = document.createElement("div");
+keypad.className = "keypad";
+keypadBackdrop.appendChild(keypad);
+document.body.appendChild(keypadBackdrop);
+
+let keypadTarget = null;
+
+function renderKeypad() {
+  keypad.innerHTML = "";
+  const readout = document.createElement("div");
+  readout.className = "keypad-readout";
+  readout.textContent = keypadTarget && keypadTarget.value !== "" ? keypadTarget.value : "0";
+  keypad.appendChild(readout);
+
+  const grid = document.createElement("div");
+  grid.className = "keypad-grid";
+  for (const key of ["7", "8", "9", "4", "5", "6", "1", "2", "3", "⌫", "0", "Listo"]) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = key === "Listo" ? "keypad-key keypad-done" : "keypad-key";
+    btn.textContent = key;
+    btn.addEventListener("click", () => handleKeypadKey(key));
+    grid.appendChild(btn);
+  }
+  keypad.appendChild(grid);
+}
+
+function handleKeypadKey(key) {
+  if (!keypadTarget) return;
+  if (key === "Listo") {
+    closeKeypad();
+    return;
+  }
+  if (key === "⌫") {
+    keypadTarget.value = keypadTarget.value.slice(0, -1);
+  } else {
+    keypadTarget.value += key;
+  }
+  keypadTarget.dispatchEvent(new Event("input", { bubbles: true }));
+  renderKeypad();
+}
+
+function closeKeypad() {
+  if (keypadTarget) keypadTarget.dispatchEvent(new Event("change", { bubbles: true }));
+  keypadBackdrop.classList.remove("open");
+  keypadTarget = null;
+}
+
+keypadBackdrop.addEventListener("click", (e) => {
+  if (e.target === keypadBackdrop) closeKeypad();
+});
+
+document.addEventListener("focusin", (e) => {
+  if (!e.target.matches('input[type="number"]')) return;
+  e.target.setAttribute("inputmode", "none"); // belt-and-suspenders: no OS keyboard even if one's ever configured
+  keypadTarget = e.target;
+  keypadTarget.value = ""; // fresh entry rather than appending after the existing/default value
+  renderKeypad();
+  keypadBackdrop.classList.add("open");
+});
+
 // ---------- connectivity status ----------
 const NETWORK_LABELS = { wifi: "WiFi", lte: "LTE", ethernet: "Ethernet" };
 
