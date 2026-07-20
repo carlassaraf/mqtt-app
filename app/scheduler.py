@@ -9,6 +9,7 @@ down at fire time, publish_command() returns False and we mark the job
 """
 import json
 import logging
+import time
 from datetime import datetime
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -19,13 +20,24 @@ from app.mqtt_client import publish_command
 logger = logging.getLogger("scheduler")
 scheduler = BackgroundScheduler()
 
+# Firmware observed corrupting/misattributing payloads when a burst of commands
+# arrives faster than its ~100ms dispatch tick can drain them (device-side
+# queueing bug, not something this app can fix) -- so pace successive commands
+# in one scheduled state out with a gap comfortably above that tick instead of
+# firing them back-to-back.
+INTER_COMMAND_DELAY_S = 0.3
+
 
 def _run_job(schedule_id: int, commands: list[dict]):
-    """Fires every command in the state, in order. One failed publish doesn't
-    stop the rest from going out -- but the row is marked 'failed' overall if
-    any of them didn't make it, since the resulting state may be incomplete."""
+    """Fires every command in the state, in order, paced by INTER_COMMAND_DELAY_S.
+    One failed publish doesn't stop the rest from going out -- but the row is
+    marked 'failed' overall if any of them didn't make it, since the resulting
+    state may be incomplete. Runs on APScheduler's own worker thread, so the
+    blocking sleep here doesn't hold up the web server."""
     all_ok = True
-    for cmd in commands:
+    for i, cmd in enumerate(commands):
+        if i > 0:
+            time.sleep(INTER_COMMAND_DELAY_S)
         ok = publish_command(cmd["command_id"], cmd.get("value"))
         all_ok = all_ok and ok
     db.mark_schedule(schedule_id, "sent" if all_ok else "failed")

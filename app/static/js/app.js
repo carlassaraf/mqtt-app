@@ -260,6 +260,12 @@ function getCmd(id) {
 
 function appendField(container, cmd) {
   const field = renderValueField(cmd);
+  // renderValueField's own label just says "valor"/"valor (ms)" -- fine when a
+  // single command sheet already shows the command name as its title, but here
+  // several fields stack together (e.g. BLK and ROT both being "valor (ms)"
+  // made them indistinguishable), so relabel with the command's own name instead.
+  const label = field.el.querySelector("label");
+  if (label) label.textContent = cmd.unit ? `${cmd.label} (${cmd.unit})` : cmd.label;
   container.appendChild(field.el);
   return field;
 }
@@ -339,6 +345,166 @@ const SCHEDULE_STATES = {
   },
 };
 
+// ---------- custom date/time picker ----------
+// A native <input type="datetime-local">'s pop-up calendar is rendered by the
+// browser itself (not page content), so it can't be resized via CSS -- it stays
+// small regardless of how big we make the input field. This builds an
+// equivalent widget entirely out of our own touch-sized elements instead.
+const MESES = [
+  "enero", "febrero", "marzo", "abril", "mayo", "junio",
+  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+];
+const DIAS_SEMANA = ["Lu", "Ma", "Mi", "Ju", "Vi", "Sa", "Do"];
+
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
+function createDateTimePicker() {
+  const now = new Date();
+  let viewYear = now.getFullYear();
+  let viewMonth = now.getMonth();
+  let selectedDay = null; // { year, month, day }, month is 0-indexed
+  let hour = (now.getHours() + 1) % 24;
+  let minute = 0;
+
+  const el = document.createElement("div");
+  el.className = "datetime-picker";
+
+  const header = document.createElement("div");
+  header.className = "cal-header";
+  const prevBtn = document.createElement("button");
+  prevBtn.type = "button";
+  prevBtn.className = "cal-nav";
+  prevBtn.textContent = "‹";
+  const title = document.createElement("span");
+  title.className = "cal-title";
+  const nextBtn = document.createElement("button");
+  nextBtn.type = "button";
+  nextBtn.className = "cal-nav";
+  nextBtn.textContent = "›";
+  header.appendChild(prevBtn);
+  header.appendChild(title);
+  header.appendChild(nextBtn);
+  el.appendChild(header);
+
+  const weekdays = document.createElement("div");
+  weekdays.className = "cal-weekdays";
+  for (const d of DIAS_SEMANA) {
+    const s = document.createElement("span");
+    s.textContent = d;
+    weekdays.appendChild(s);
+  }
+  el.appendChild(weekdays);
+
+  const grid = document.createElement("div");
+  grid.className = "cal-grid";
+  el.appendChild(grid);
+
+  const timeRow = document.createElement("div");
+  timeRow.className = "time-row";
+  const timeLabel = document.createElement("label");
+  timeLabel.textContent = "hora";
+  const timeInputs = document.createElement("div");
+  timeInputs.className = "time-inputs";
+  const hhInput = document.createElement("input");
+  hhInput.type = "number";
+  hhInput.min = 0;
+  hhInput.max = 23;
+  const sep = document.createElement("span");
+  sep.textContent = ":";
+  const mmInput = document.createElement("input");
+  mmInput.type = "number";
+  mmInput.min = 0;
+  mmInput.max = 59;
+  timeInputs.appendChild(hhInput);
+  timeInputs.appendChild(sep);
+  timeInputs.appendChild(mmInput);
+  timeRow.appendChild(timeLabel);
+  timeRow.appendChild(timeInputs);
+  el.appendChild(timeRow);
+
+  function isBeforeCurrentMonth(y, m) {
+    return y < now.getFullYear() || (y === now.getFullYear() && m < now.getMonth());
+  }
+
+  function renderGrid() {
+    grid.innerHTML = "";
+    const offset = (new Date(viewYear, viewMonth, 1).getDay() + 6) % 7; // Monday-first
+    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+    const todayY = now.getFullYear(), todayM = now.getMonth(), todayD = now.getDate();
+
+    for (let i = 0; i < offset; i++) {
+      const empty = document.createElement("span");
+      empty.className = "cal-day empty";
+      grid.appendChild(empty);
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "cal-day";
+      btn.textContent = day;
+
+      const isPast = viewYear < todayY
+        || (viewYear === todayY && viewMonth < todayM)
+        || (viewYear === todayY && viewMonth === todayM && day < todayD);
+      if (isPast) btn.disabled = true;
+
+      if (viewYear === todayY && viewMonth === todayM && day === todayD) {
+        btn.classList.add("today");
+      }
+      if (selectedDay && selectedDay.year === viewYear && selectedDay.month === viewMonth && selectedDay.day === day) {
+        btn.classList.add("selected");
+      }
+
+      btn.addEventListener("click", () => {
+        selectedDay = { year: viewYear, month: viewMonth, day };
+        renderGrid();
+      });
+      grid.appendChild(btn);
+    }
+  }
+
+  function renderCalendar() {
+    title.textContent = `${MESES[viewMonth][0].toUpperCase()}${MESES[viewMonth].slice(1)} ${viewYear}`;
+    const prev = viewMonth === 0 ? { y: viewYear - 1, m: 11 } : { y: viewYear, m: viewMonth - 1 };
+    prevBtn.disabled = isBeforeCurrentMonth(prev.y, prev.m);
+    renderGrid();
+  }
+
+  prevBtn.addEventListener("click", () => {
+    if (prevBtn.disabled) return;
+    if (viewMonth === 0) { viewMonth = 11; viewYear -= 1; } else { viewMonth -= 1; }
+    renderCalendar();
+  });
+  nextBtn.addEventListener("click", () => {
+    if (viewMonth === 11) { viewMonth = 0; viewYear += 1; } else { viewMonth += 1; }
+    renderCalendar();
+  });
+
+  hhInput.value = pad2(hour);
+  mmInput.value = pad2(minute);
+  hhInput.addEventListener("change", () => {
+    hour = Math.max(0, Math.min(23, Number(hhInput.value) || 0));
+    hhInput.value = pad2(hour);
+  });
+  mmInput.addEventListener("change", () => {
+    minute = Math.max(0, Math.min(59, Number(mmInput.value) || 0));
+    mmInput.value = pad2(minute);
+  });
+
+  renderCalendar();
+
+  return {
+    el,
+    getValue() {
+      if (!selectedDay) return null;
+      return `${selectedDay.year}-${pad2(selectedDay.month + 1)}-${pad2(selectedDay.day)}T${pad2(hour)}:${pad2(minute)}`;
+    },
+  };
+}
+
 function renderScheduleForm() {
   const form = document.getElementById("scheduleForm");
   form.innerHTML = "";
@@ -370,23 +536,32 @@ function renderScheduleForm() {
   const dtLabel = document.createElement("label");
   dtLabel.textContent = "ejecutar el";
   form.appendChild(dtLabel);
-  const dtInput = document.createElement("input");
-  dtInput.type = "datetime-local";
-  dtInput.className = "schedule-datetime";
-  form.appendChild(dtInput);
+  const picker = createDateTimePicker();
+  form.appendChild(picker.el);
 
   const addBtn = document.createElement("button");
   addBtn.className = "primary";
   addBtn.textContent = "Programar estado";
   addBtn.addEventListener("click", async () => {
-    if (!dtInput.value) return;
+    const runAt = picker.getValue();
+    if (!runAt) return;
     const { commands, label } = collect();
-    await fetch("/api/schedule", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ label, commands, run_at: dtInput.value }),
-    });
+    addBtn.disabled = true;
+    try {
+      const res = await fetch("/api/schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label, commands, run_at: runAt }),
+      });
+      addBtn.textContent = res.ok ? "Programado" : "Error";
+    } catch {
+      addBtn.textContent = "Error";
+    }
     loadSchedules();
+    setTimeout(() => {
+      addBtn.disabled = false;
+      addBtn.textContent = "Programar estado";
+    }, 1200);
   });
   form.appendChild(addBtn);
 }
