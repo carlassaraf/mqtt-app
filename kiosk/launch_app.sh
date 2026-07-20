@@ -6,7 +6,7 @@
 # in this folder are still the recommended always-on setup; this script is
 # the "just double-click the icon" path so the client doesn't need them
 # installed for the app to start.
-APP_DIR=/home/pi/led-kiosk
+APP_DIR="$HOME/led-kiosk"
 
 if ! curl -s http://127.0.0.1:8000/api/status > /dev/null; then
   cd "$APP_DIR"

@@ -11,9 +11,9 @@ Requires=led-kiosk-backend.service
 
 [Service]
 Type=simple
-User=pi
+User=pi4
 Environment=DISPLAY=:0
-ExecStart=/home/pi/led-kiosk/kiosk/start_kiosk.sh
+ExecStart=/home/pi4/led-kiosk/kiosk/start_kiosk.sh
 Restart=on-failure
 RestartSec=3
 

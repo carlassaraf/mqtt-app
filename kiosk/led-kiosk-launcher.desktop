@@ -2,7 +2,7 @@
 Type=Application
 Name=Controlador de tira LED
 Comment=Abre el panel de control de la tira LED (modo kiosko)
-Exec=/home/pi/led-kiosk/kiosk/launch_app.sh
+Exec=/home/pi4/led-kiosk/kiosk/launch_app.sh
 Icon=video-display
 Terminal=false
 Categories=Utility;

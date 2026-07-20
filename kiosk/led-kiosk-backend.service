@@ -7,9 +7,9 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=pi
-WorkingDirectory=/home/pi/led-kiosk
-ExecStart=/home/pi/led-kiosk/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+User=pi4
+WorkingDirectory=/home/pi4/led-kiosk
+ExecStart=/home/pi4/led-kiosk/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
 Restart=on-failure
 RestartSec=3
 
