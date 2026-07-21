@@ -9,13 +9,14 @@ down at fire time, publish_command() returns False and we mark the job
 """
 import json
 import logging
+import threading
 import time
 from datetime import datetime
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from app import db
-from app.mqtt_client import publish_command
+from app.mqtt_client import is_connected, publish_command
 
 logger = logging.getLogger("scheduler")
 scheduler = BackgroundScheduler()
@@ -26,6 +27,21 @@ scheduler = BackgroundScheduler()
 # in one scheduled state out with a gap comfortably above that tick instead of
 # firing them back-to-back.
 INTER_COMMAND_DELAY_S = 0.3
+
+# The device is normally powered off overnight, so the app itself may not be
+# running when a schedule's run_at passes. On restart, a schedule missed by
+# no more than this long is still worth catching up (it's just last night's
+# run); anything older is stale and gets marked 'missed' instead of firing a
+# possibly-days-old state out of nowhere.
+MISSED_SCHEDULE_CATCHUP_S = 16 * 3600
+
+# How long to wait for MQTT to actually finish connecting before firing
+# catch-up commands at startup. main.py calls mqtt_client.start() (which only
+# *initiates* the connection via connect_async) immediately before
+# scheduler.start() -- so right after boot, is_connected() is almost always
+# still False, and publish_command() would otherwise fail immediately.
+CATCHUP_CONNECT_TIMEOUT_S = 30
+CATCHUP_POLL_INTERVAL_S = 1
 
 
 def _run_job(schedule_id: int, commands: list[dict]):
@@ -70,21 +86,46 @@ def start():
     _rearm_pending()
 
 
+def _wait_for_mqtt_then_catch_up(catchup: list[tuple[int, list[dict]]]):
+    """Runs on its own thread at startup. Waits (briefly, with a timeout) for
+    MQTT to connect, then fires each missed-but-recent schedule in
+    chronological order -- if several were missed, the last one firing last
+    is correct, it's exactly what would have happened had the device stayed
+    on overnight. Paced the same as commands within one schedule, for the
+    same reason (avoids a firmware-queue-corrupting burst)."""
+    waited = 0
+    while not is_connected() and waited < CATCHUP_CONNECT_TIMEOUT_S:
+        time.sleep(CATCHUP_POLL_INTERVAL_S)
+        waited += CATCHUP_POLL_INTERVAL_S
+    for i, (schedule_id, commands) in enumerate(catchup):
+        if i > 0:
+            time.sleep(INTER_COMMAND_DELAY_S)
+        _run_job(schedule_id, commands)
+
+
 def _rearm_pending():
     now = datetime.now().timestamp()
+    catchup = []
     for row in db.list_schedules():
+        commands = json.loads(row["commands_json"])
         if row["run_at"] <= now:
-            db.mark_schedule(row["id"], "missed")
+            if now - row["run_at"] <= MISSED_SCHEDULE_CATCHUP_S:
+                catchup.append((row["id"], commands))
+            else:
+                db.mark_schedule(row["id"], "missed")
             continue
         scheduler.add_job(
             _run_job,
             "date",
             run_date=datetime.fromtimestamp(row["run_at"]),
-            args=[row["id"], json.loads(row["commands_json"])],
+            args=[row["id"], commands],
             id=str(row["id"]),
             misfire_grace_time=3600,
         )
-    logger.info("Rearmed %d pending scheduled command(s)", len(db.list_schedules()))
+    if catchup:
+        logger.info("Catching up %d missed-but-recent schedule(s) once MQTT connects", len(catchup))
+        threading.Thread(target=_wait_for_mqtt_then_catch_up, args=(catchup,), daemon=True).start()
+    logger.info("Rearmed pending scheduled command(s)")
 
 
 def stop():
