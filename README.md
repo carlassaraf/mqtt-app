@@ -25,6 +25,7 @@ profiles/
 kiosk/
   start_kiosk.sh                launches Chromium in kiosk mode
   launch_app.sh                 starts the backend (if not already running) + start_kiosk.sh
+  update_app.sh                 git pull + restart backend + clear Chromium cache + relaunch
   led-kiosk-backend.service     systemd unit for the FastAPI app
   led-kiosk-browser.service     systemd unit for the kiosk browser
   led-kiosk-launcher.desktop    one-click desktop icon that runs launch_app.sh

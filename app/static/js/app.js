@@ -99,6 +99,20 @@ document.getElementById("closeAppBtn").addEventListener("click", async () => {
   }
 });
 
+// ---------- update app ----------
+// Runs kiosk/update_app.sh on the device (git pull, restart backend, clear
+// Chromium's cache, relaunch). The backend fires it off detached and returns
+// right away -- the script kills the very backend process handling this
+// request partway through, so there's no meaningful response to wait for.
+document.getElementById("updateAppBtn").addEventListener("click", async () => {
+  if (!confirm("¿Buscar actualizaciones? Si hay novedades, se cerrará y reabrirá el navegador.")) return;
+  try {
+    await fetch("/api/system/update", { method: "POST" });
+  } catch {
+    // same as closeAppBtn -- the connection may drop before a response arrives
+  }
+});
+
 // ---------- connectivity status ----------
 const NETWORK_LABELS = { wifi: "WiFi", lte: "LTE", ethernet: "Ethernet" };
 
