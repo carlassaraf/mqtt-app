@@ -47,13 +47,16 @@ body { display: flex; flex-direction: column; }
 }
 .close-app-btn:active { background: var(--surface-2); border-color: var(--danger); color: var(--danger); }
 
-.tabs { display: flex; gap: 4px; padding: 12px 28px 0; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-.tab {
-  background: none; border: none; color: var(--text-dim);
-  font-size: 16px; font-weight: 500; padding: 14px 22px;
-  border-bottom: 3px solid transparent; cursor: pointer;
+.tabs {
+  display: flex; gap: 8px; padding: 24px 56px 0; border-bottom: 1px solid var(--border);
+  flex-shrink: 0; background: #ffffff;
 }
-.tab.active { color: var(--text); border-bottom-color: var(--accent); }
+.tab {
+  background: none; border: none; color: #555;
+  font-size: 32px; font-weight: 500; padding: 28px 44px;
+  border-bottom: 6px solid transparent; cursor: pointer;
+}
+.tab.active { color: #111; border-bottom-color: var(--accent); }
 
 main { padding: 24px 28px 100px; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 
