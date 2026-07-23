@@ -8,6 +8,7 @@ from fastapi.templating import Jinja2Templates
 
 from app import db, mqtt_client, network_status, scheduler
 from app.routes import commands, logs, schedule, system
+from app.version import VERSION
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
@@ -47,4 +48,4 @@ def status():
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse("index.html", {"request": request, "version": VERSION})

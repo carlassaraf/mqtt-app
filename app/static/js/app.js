@@ -132,6 +132,17 @@ async function pollStatus() {
 setInterval(pollStatus, 4000);
 pollStatus();
 
+// ---------- clock ----------
+function tickClock() {
+  const now = new Date();
+  document.getElementById("clock").textContent = now.toLocaleString("es-ES", {
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  });
+}
+setInterval(tickClock, 1000);
+tickClock();
+
 // ---------- single-value field rendering (shared by command sheet + schedule form) ----------
 // Returns { el, getValue } or null if the command takes no value at all
 // (value_type "none" with no fixed_value -- e.g. INV, AUT, STA).
