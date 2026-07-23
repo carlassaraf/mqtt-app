@@ -81,6 +81,12 @@
         "#FF00FF", "#00FFFF", "#FFFFFF", "#FFA500",
         "#800080", "#000000"
       ]
+    },
+    {
+      "id": "OUT",
+      "label": "Indicador LED de estado",
+      "value_type": "toggle",
+      "note": "LED de estado del dispositivo, no las tiras RGB"
     }
   ]
 }

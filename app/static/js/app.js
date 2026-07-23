@@ -441,6 +441,24 @@ const SCHEDULE_STATES = {
       });
     },
   },
+  out: {
+    label: "Indicador LED",
+    // Unlike the states above, OUT is unrelated to frame_mngr (a separate
+    // status LED, not the RGB strips) -- it's not paused/resumed by AUT and
+    // doesn't interact with any other mode, so this is the one state that's
+    // just its own single command, no AUT/BRI/BLK/ROT bundled in.
+    fields(container) {
+      const out = appendField(container, getCmd("OUT"));
+
+      return () => {
+        const value = out.getValue();
+        return {
+          commands: [{ command_id: "OUT", value }],
+          label: `Indicador LED ${value === 1 ? "encendido" : "apagado"}`,
+        };
+      };
+    },
+  },
 };
 
 // ---------- custom date/time picker ----------
