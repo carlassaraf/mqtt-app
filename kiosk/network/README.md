@@ -5,10 +5,12 @@ default route; LTE only carries traffic when WiFi is down. Failover is
 kernel-level via NetworkManager route metrics, not a polling/switching
 daemon, so it reacts as fast as the WiFi interface actually goes down.
 
-**Status: written, not yet run against the physical A7600 + Pi.** Review
-both scripts before running — the AT port and USB mode-switch command in
-`switch_a7600_qmi.sh` in particular are SIMCOM's documented defaults, not
-confirmed against this specific unit.
+**Status: `switch_a7600_qmi.sh` confirmed against a physical unit; the rest
+still isn't.** The module defaults to (or gets left in) RNDIS mode
+(idVendor=1e0e, idProduct=9011, `rndis_host` + 4 `ttyUSB` ports) — QMI mode
+is actually PID 9001, not 9011. An earlier version of this script sent
+9011 thinking it was the QMI PID; that was backwards and has been fixed.
+`setup_lte_failover.sh` (the NetworkManager/APN side) is still unverified.
 
 ## Steps
 
