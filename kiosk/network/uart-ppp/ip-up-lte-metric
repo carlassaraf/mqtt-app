@@ -1,0 +1,7 @@
+#!/bin/sh
+# pppd runs this after the LTE link comes up ($1 = interface name, e.g.
+# ppp0). Gives it a high (low-priority) route metric so it never preempts
+# WiFi's default route (metric 100, set by ../setup_lte_failover.sh) --
+# this link only carries traffic once WiFi's route is gone.
+set -eu
+ip route replace default dev "$1" metric __LTE_METRIC__

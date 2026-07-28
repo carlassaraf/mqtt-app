@@ -6,7 +6,8 @@ import subprocess
 
 _IFACE_PATTERNS = [
     (re.compile(r"^wlan"), "wifi"),
-    (re.compile(r"^wwan"), "lte"),
+    (re.compile(r"^wwan"), "lte"),  # USB/QMI path (setup_lte_failover.sh)
+    (re.compile(r"^ppp"), "lte"),  # UART/pppd path (setup_lte_failover_uart.sh)
     (re.compile(r"^eth"), "ethernet"),
 ]
 

@@ -1,0 +1,12 @@
+[Unit]
+Description=LTE backup PPP link (A7600 over UART)
+After=local-fs.target
+Wants=local-fs.target
+
+[Service]
+ExecStart=/usr/sbin/pppd call lte-backup
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

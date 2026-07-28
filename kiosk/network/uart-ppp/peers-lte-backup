@@ -1,0 +1,18 @@
+__SERIAL_DEV__
+__BAUD__
+local
+nocrtscts
+noauth
+lock
+nodetach
+persist
+maxfail 0
+holdoff 5
+noipdefault
+usepeerdns
+novj
+novjccomp
+connect "/usr/sbin/chat -v -f /etc/chatscripts/lte-backup.chat"
+# Uncomment below if this SIM needs PAP/CHAP auth (Personal AR typically doesn't):
+# user "..."
+# password "..."

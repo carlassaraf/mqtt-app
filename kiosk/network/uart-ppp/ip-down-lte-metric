@@ -1,0 +1,4 @@
+#!/bin/sh
+# pppd runs this as the LTE link goes down ($1 = interface name).
+set -eu
+ip route del default dev "$1" metric __LTE_METRIC__ 2>/dev/null || true
