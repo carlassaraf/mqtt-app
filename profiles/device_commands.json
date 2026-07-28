@@ -84,7 +84,7 @@
     },
     {
       "id": "OUT",
-      "label": "Indicador LED de estado",
+      "label": "Luminaria",
       "value_type": "toggle",
       "note": "LED de estado del dispositivo, no las tiras RGB"
     }

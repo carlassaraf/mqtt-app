@@ -26,8 +26,10 @@
 
 <nav class="tabs">
   <button class="tab active" data-tab="commands">Comandos</button>
-  <button class="tab" data-tab="log">Registro</button>
   <button class="tab" data-tab="schedule">Programación</button>
+  <button class="tab" data-tab="pending">Eventos Pendientes</button>
+  <button class="tab" data-tab="special">Comandos Especiales</button>
+  <button class="tab" data-tab="status">Status</button>
 </nav>
 
 <main>
@@ -35,14 +37,20 @@
     <div class="command-grid" id="commandGrid"><!-- populated by app.js --></div>
   </section>
 
-  <section id="tab-log" class="tab-panel">
-    <div class="log-view" id="logView"></div>
-  </section>
-
   <section id="tab-schedule" class="tab-panel">
     <div class="schedule-form" id="scheduleForm"></div>
-    <h2 class="section-heading">Pendientes</h2>
+  </section>
+
+  <section id="tab-pending" class="tab-panel">
     <div class="schedule-list" id="scheduleList"></div>
+  </section>
+
+  <section id="tab-special" class="tab-panel">
+    <div class="command-grid" id="specialCommandGrid"><!-- populated by app.js --></div>
+  </section>
+
+  <section id="tab-status" class="tab-panel">
+    <div class="log-view" id="logView"></div>
   </section>
 </main>
 

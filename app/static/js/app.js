@@ -255,18 +255,38 @@ function renderValueField(cmd) {
 }
 
 // ---------- commands tab ----------
-async function loadProfile() {
-  const res = await fetch("/api/commands");
-  profile = await res.json();
-  const grid = document.getElementById("commandGrid");
+// Ping-pong (PPG/PPC/PPK) and three-strip color rotation (SCR/SCL) move
+// entirely out of "Comandos" into their own "Comandos Especiales" tab.
+// BLK/ROT are part of both modes too (see SCHEDULE_STATES.pingpong/
+// stripcolor) but are also plain general-purpose commands, so they stay in
+// "Comandos" AND get a duplicated card here -- same command definition from
+// the profile, rendered a second time -- so the whole mode is manageable
+// from one tab without losing BLK/ROT from the main one.
+const SPECIAL_ONLY_COMMAND_IDS = ["PPG", "PPC", "PPK", "SCR", "SCL"];
+const SPECIAL_SHARED_COMMAND_IDS = ["BLK", "ROT"];
+
+function renderCommandGrid(gridId, commands) {
+  const grid = document.getElementById(gridId);
   grid.innerHTML = "";
-  for (const cmd of profile.commands) {
+  for (const cmd of commands) {
     const card = document.createElement("div");
     card.className = "command-card";
     card.innerHTML = `<span class="command-glyph">${cmd.id[0]}</span><span>${cmd.label}</span>`;
     card.addEventListener("click", () => openCommandSheet(cmd));
     grid.appendChild(card);
   }
+}
+
+async function loadProfile() {
+  const res = await fetch("/api/commands");
+  profile = await res.json();
+  renderCommandGrid("commandGrid", profile.commands.filter((c) => !SPECIAL_ONLY_COMMAND_IDS.includes(c.id)));
+  renderCommandGrid(
+    "specialCommandGrid",
+    profile.commands.filter(
+      (c) => SPECIAL_ONLY_COMMAND_IDS.includes(c.id) || SPECIAL_SHARED_COMMAND_IDS.includes(c.id)
+    )
+  );
   renderScheduleForm();
 }
 
@@ -442,7 +462,7 @@ const SCHEDULE_STATES = {
     },
   },
   out: {
-    label: "Indicador LED",
+    label: "Luminaria",
     // Unlike the states above, OUT is unrelated to frame_mngr (a separate
     // status LED, not the RGB strips) -- it's not paused/resumed by AUT and
     // doesn't interact with any other mode, so this is the one state that's
@@ -454,7 +474,7 @@ const SCHEDULE_STATES = {
         const value = out.getValue();
         return {
           commands: [{ command_id: "OUT", value }],
-          label: `Indicador LED ${value === 1 ? "encendido" : "apagado"}`,
+          label: `Luminaria ${value === 1 ? "encendida" : "apagada"}`,
         };
       };
     },
