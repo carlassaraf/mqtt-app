@@ -79,13 +79,26 @@ config uses `local`/`nocrtscts`.
 
 1. Confirm AT communication first: `sudo minicom -D /dev/serial0 -b 115200`
    → type `AT` → expect `OK`. Don't proceed until this works.
-2. `sudo ./setup_lte_failover_uart.sh` — installs `ppp`, tells
+2. `sudo ./setup_lte_failover_uart.sh` — installs `ppp`, points
+   NetworkManager away from managing `/etc/resolv.conf` and writes a
+   static one with public resolvers (see "DNS" below), tells
    ModemManager to ignore the port (`ID_MM_DEVICE_IGNORE`, since it can't
    use it anyway and would otherwise contend with pppd for the port),
    installs the chat script + pppd peer config (APN `datos.personal.com` —
    edit `uart-ppp/peers-lte-backup`'s auth lines if this SIM needs
    credentials) and an `lte-backup` systemd service that keeps pppd
    running (`persist`, auto-restart).
+
+### DNS
+
+The pppd peer config does **not** use `usepeerdns`. The carrier's DNS
+servers are only reachable over the cellular link itself — accepting them
+overwrites `/etc/resolv.conf` and breaks name resolution whenever WiFi
+(not LTE) is actually carrying traffic, which is exactly backwards for a
+backup link. `setup_lte_failover_uart.sh` instead sets `dns=none` in
+`NetworkManager.conf` and writes a static `/etc/resolv.conf` pointing at
+public resolvers (1.1.1.1, 8.8.8.8), which resolve correctly over either
+uplink.
 
 ### Verifying (UART path)
 

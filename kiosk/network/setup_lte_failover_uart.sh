@@ -19,6 +19,14 @@
 # LTE once it's gone -- same failover model as the USB/QMI path, just
 # enforced via pppd hooks instead of NetworkManager.
 #
+# DNS: the pppd peer config deliberately does NOT use `usepeerdns` -- the
+# carrier's DNS servers are only reachable over the cellular link itself,
+# so accepting them clobbers /etc/resolv.conf and breaks name resolution
+# whenever WiFi (not LTE) is actually carrying traffic. Instead this
+# script points NetworkManager away from managing resolv.conf (dns=none)
+# and writes a static, link-independent resolv.conf using public
+# resolvers, which work the same over either uplink.
+#
 # Prereq: AT communication over the UART port must already work (confirm
 # with e.g. `sudo minicom -D /dev/serial0 -b 115200` -> AT -> OK) before
 # running this.
@@ -46,6 +54,27 @@ fi
 echo "Installing pppd + chat..."
 apt-get update
 apt-get install -y ppp
+
+echo "Pointing NetworkManager away from resolv.conf management (dns=none)..."
+NM_CONF=/etc/NetworkManager/NetworkManager.conf
+if grep -q '^\[main\]' "$NM_CONF"; then
+  if grep -q '^dns=' "$NM_CONF"; then
+    sed -i 's/^dns=.*/dns=none/' "$NM_CONF"
+  else
+    sed -i '/^\[main\]/a dns=none' "$NM_CONF"
+  fi
+else
+  printf '\n[main]\ndns=none\n' >> "$NM_CONF"
+fi
+
+echo "Writing static, link-independent resolv.conf (public resolvers)..."
+cat > /etc/resolv.conf <<'EOF'
+nameserver 1.1.1.1
+nameserver 8.8.8.8
+EOF
+
+echo "Restarting NetworkManager to apply dns=none (brief WiFi blip expected)..."
+systemctl restart NetworkManager
 
 echo "Telling ModemManager to leave ${SERIAL_DEV} alone (pppd needs the port, not MM)..."
 cat > /etc/udev/rules.d/78-mm-custom-uart.rules <<'EOF'
