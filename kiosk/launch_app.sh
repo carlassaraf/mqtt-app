@@ -22,6 +22,10 @@ fi
 
 if ! curl -s http://127.0.0.1:8000/api/status > /dev/null; then
   cd "$APP_DIR"
+  # led-kiosk-backend.service picks this up via EnvironmentFile; this
+  # non-systemd launch path needs to load it itself, e.g. for
+  # SMS_NOTIFY_NUMBERS (see app/sms.py).
+  [ -f /etc/led-kiosk.env ] && set -a && source /etc/led-kiosk.env && set +a
   nohup venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 \
     > /tmp/led-kiosk-backend.log 2>&1 &
   disown
