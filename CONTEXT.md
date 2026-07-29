@@ -140,13 +140,18 @@ config.example.json               copy to config.json, already has real broker/t
    this repo's own browser-launch scripts, and ideally revisiting
    `start_kiosk.sh` to match whatever's actually deployed. Read-only root /
    overlayfs still not done either.
-3. **Screen on/off button** (`kiosk/screen-button/`) — a `gpiozero` daemon
-   on GPIO17 toggles the HDMI output (`HDMI-A-1`, confirmed via
-   `wlr-randr`) on each press; touchscreen (USB, separate from the
-   display) stays live throughout. **Unconfirmed**: whether touch/mouse
-   input wakes a display that was blanked via `wlr-randr` — X11's DPMS
-   guaranteed this, Wayland/labwc doesn't necessarily (see the folder's
-   README for the fallback if it turns out not to work).
+3. **Screen on/off button** (`kiosk/screen-button/`) — **confirmed working
+   on hardware**: a `gpiozero` daemon on GPIO17 toggles the HDMI output
+   (`HDMI-A-1`) via `wlopm --off`/`--on` (the DPMS-equivalent
+   output-power-management protocol) on each press; touchscreen (USB,
+   separate from the display) stays live throughout. Requires
+   `sudo apt install wlopm` on-device. **Important pitfall already hit and
+   documented in the folder's README**: `wlr-randr --off`/`--on` looks like
+   the obvious tool but uses a different protocol that fully disables the
+   output — re-enabling it that way failed outright and left the display
+   stuck off until a reboot; don't use it for this. **Still unconfirmed**:
+   whether touch/mouse input wakes a display blanked via `wlopm` the way
+   X11's DPMS guaranteed (see the folder's README for the fallback if not).
 4. **Minimize button** (topbar, `app/routes/system.py` `minimize_browser()`)
    — **confirmed working on hardware**: `wlrctl toplevel minimize chromium`
    hides the window, `wlrctl toplevel focus chromium` (used in

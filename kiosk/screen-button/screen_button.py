@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""GPIO button daemon: toggles the HDMI display on/off via wlr-randr.
+"""GPIO button daemon: toggles the HDMI display on/off via wlopm.
 Standalone (not part of the FastAPI app) since it needs GPIO access and must
 keep working independent of the backend/browser. See README.md for wiring
 and setup."""
-import re
 import subprocess
 from signal import pause
 
@@ -12,32 +11,28 @@ from gpiozero import Button
 BUTTON_PIN = 17  # physical pin 11 -- GPIO14/15 are already used by the
                  # A7600 modem's UART, see kiosk/network/
 
-OUTPUT = "HDMI-A-1"  # confirmed via `wlr-randr` on this device -- re-check
-                     # with `wlr-randr` if the monitor is ever swapped
+OUTPUT = "HDMI-A-1"  # confirmed via `wlr-randr`/`wlopm` on this device --
+                     # re-check if the monitor is ever swapped
+
+# wlopm (wlr-output-power-management-v1), not wlr-randr (wlr-output-management-v1):
+# wlr-randr's --off/--on fully disables/re-enables the output, tearing down
+# its mode entirely -- confirmed on hardware that re-enabling it that way
+# fails ("failed to apply configuration") and doesn't recover without a
+# reboot. wlopm is the DPMS-equivalent soft on/off that leaves the mode
+# intact, confirmed to round-trip cleanly on this device.
 
 
 def _screen_is_on() -> bool:
-    # `wlr-randr --output X` with no action still lists *every* output
-    # (confirmed on hardware -- the --output filter only applies to
-    # actions like --on/--off, not to plain queries), including a
-    # synthetic "NOOP-1 Headless output" labwc creates as a fallback that
-    # is always "Enabled: yes". A naive substring search over the whole
-    # listing matches that placeholder instead of the real display, so
-    # this has to scope to OUTPUT's own block specifically: each output's
-    # block starts at a line with no leading whitespace, so split on that.
-    out = subprocess.run(["wlr-randr"], capture_output=True, text=True).stdout
-    blocks = re.split(r"\n(?=\S)", out)
-    block = next((b for b in blocks if b.startswith(OUTPUT)), "")
-    is_on = "Enabled: yes" in block
-    print(f"[screen_button] state check: is_on={is_on} block={block!r}", flush=True)
-    return is_on
+    out = subprocess.run(["wlopm"], capture_output=True, text=True).stdout
+    for line in out.splitlines():
+        name, _, state = line.partition(" ")
+        if name == OUTPUT:
+            return state.strip() == "on"
+    return False
 
 
 def toggle_screen():
-    action = "--off" if _screen_is_on() else "--on"
-    print(f"[screen_button] toggling: {action}", flush=True)
-    result = subprocess.run(["wlr-randr", "--output", OUTPUT, action], capture_output=True, text=True)
-    print(f"[screen_button] toggle result: returncode={result.returncode} stdout={result.stdout!r} stderr={result.stderr!r}", flush=True)
+    subprocess.run(["wlopm", "--off" if _screen_is_on() else "--on", OUTPUT])
 
 
 if __name__ == "__main__":
