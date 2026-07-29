@@ -36,7 +36,7 @@ body { display: flex; flex-direction: column; }
 
 .topbar-top { display: flex; align-items: center; justify-content: space-between; }
 .topbar-actions { display: flex; align-items: center; gap: 18px; }
-.topbar-info { display: flex; align-items: center; justify-content: flex-end; gap: 18px; }
+.topbar-info { display: flex; align-items: center; justify-content: flex-start; gap: 18px; }
 .meta { display: flex; align-items: center; gap: 10px; font-size: 28px; color: var(--text-dim); }
 .meta .clock { font-variant-numeric: tabular-nums; }
 .meta .version { font-family: var(--font-mono); font-size: 24px; opacity: .7; }
