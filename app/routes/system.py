@@ -30,3 +30,14 @@ def update_app():
     script = ROOT / "kiosk" / "update_app.sh"
     subprocess.Popen([str(script)], start_new_session=True)
     return {"status": "updating"}
+
+
+@router.post("/shutdown")
+def shutdown_system():
+    """Powers off the Pi. Requires the NOPASSWD sudoers rule installed by
+    kiosk/install_shutdown_permission.sh -- the backend runs as an
+    unprivileged user and can't call shutdown otherwise. Detached like
+    update_app(): the process shutting down means there's nothing left to
+    await."""
+    subprocess.Popen(["sudo", "/sbin/shutdown", "-h", "now"], start_new_session=True)
+    return {"status": "shutting down"}

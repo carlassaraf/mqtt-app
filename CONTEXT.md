@@ -115,6 +115,8 @@ app/
 profiles/device_commands.json   <- edit this to add/adjust commands, no code changes needed (labels in Spanish)
 kiosk/                            start script + 2 systemd units (untested on hardware)
   network/                         LTE failover scripts + README (untested on hardware, see gap #1 below)
+  power-button/                    physical GPIO3 shutdown/power-on button, README + config.txt recipe
+  install_shutdown_permission.sh   grants pi4 passwordless sudo for `shutdown -h now`, needed by the in-app power button
 config.example.json               copy to config.json, already has real broker/topics filled in
 ```
 
@@ -130,9 +132,13 @@ config.example.json               copy to config.json, already has real broker/t
    the MQTT status.
 2. **Kiosk lockdown** — systemd units are written but unverified: need
    auto-login + minimal WM on the Pi, and ideally overlayfs/read-only root.
-3. **LoRa transport** — deferred by design, see architecture note above for
+3. **Shutdown/power-on button** (physical GPIO3, `kiosk/power-button/`, +
+   in-app power button in the topbar) — written, not yet verified against
+   physical hardware. Needs `kiosk/install_shutdown_permission.sh` run once
+   on-device for the in-app button to have permission to actually shut down.
+4. **LoRa transport** — deferred by design, see architecture note above for
    how it should slot in.
-4. Decide whether SMS notification visibility belongs in the UI (open
+5. Decide whether SMS notification visibility belongs in the UI (open
    question for the client, not yet decided either way).
 
 ## Local dev

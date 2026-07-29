@@ -39,7 +39,7 @@ body { display: flex; flex-direction: column; }
 .meta .clock { font-variant-numeric: tabular-nums; }
 .meta .version { font-family: var(--font-mono); font-size: 24px; opacity: .7; }
 .status { display: flex; align-items: center; gap: 8px; font-size: 22px; color: var(--text-dim); }
-.status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--danger); transition: background .3s; }
+.status-dot { width: 18px; height: 18px; border-radius: 50%; background: var(--danger); transition: background .3s; }
 .status-dot.connected { background: var(--accent); }
 
 .icon-btn {
@@ -50,6 +50,7 @@ body { display: flex; flex-direction: column; }
 }
 .icon-btn:active { background: var(--surface-2); }
 .update-app-btn:active { border-color: var(--accent); color: var(--accent); }
+.power-btn:active { border-color: var(--danger); color: var(--danger); }
 .close-app-btn:active { border-color: var(--danger); color: var(--danger); }
 
 .tabs {
