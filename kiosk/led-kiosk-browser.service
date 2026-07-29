@@ -1,9 +1,18 @@
 # Install: sudo cp led-kiosk-browser.service /etc/systemd/system/
 #          sudo systemctl enable --now led-kiosk-browser
 # Requires the Pi to auto-login to a graphical session (raspi-config ->
-# System Options -> Boot / Auto Login -> Desktop Autologin) and a minimal
-# window manager (e.g. `sudo apt install matchbox-window-manager`) running
-# before this starts, since Chromium needs an X display.
+# System Options -> Boot / Auto Login -> Desktop Autologin).
+#
+# NOTE: this device has been confirmed on hardware to run Wayland with the
+# labwc compositor (Raspberry Pi OS on Debian 13 trixie), not X11 --
+# matchbox-window-manager (previously referenced here) doesn't apply. It's
+# also not confirmed that Chromium is actually being launched via this
+# service/start_kiosk.sh on the live device: the running Chromium process
+# was observed with flags (--enable-remote-extensions, --use-angle=gles,
+# --ozone-platform=wayland, etc.) that start_kiosk.sh doesn't set, which
+# suggests it may instead be started by Raspberry Pi OS's own built-in
+# kiosk-mode boot option. Worth confirming with the client which launch
+# path is actually in use before relying on this unit.
 [Unit]
 Description=LED kiosk Chromium browser
 After=led-kiosk-backend.service graphical.target

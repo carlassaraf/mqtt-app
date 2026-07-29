@@ -1,5 +1,11 @@
 # Install: sudo cp led-kiosk-backend.service /etc/systemd/system/
 #          sudo systemctl enable --now led-kiosk-backend
+# WAYLAND_DISPLAY/XDG_RUNTIME_DIR (not DISPLAY -- this device runs
+# Wayland/labwc, confirmed on hardware, not X11) are needed for
+# minimize_browser() in app/routes/system.py, which shells out to a Wayland
+# window-management tool. wayland-0 and /run/user/1000 are this device's
+# confirmed values (1000 = pi4's uid, check `id -u pi4` if redeployed to a
+# different user).
 [Unit]
 Description=LED kiosk FastAPI backend
 After=network-online.target
@@ -8,7 +14,8 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=pi4
-Environment=DISPLAY=:0
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=XDG_RUNTIME_DIR=/run/user/1000
 WorkingDirectory=/home/pi4/led-kiosk
 ExecStart=/home/pi4/led-kiosk/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
 Restart=on-failure

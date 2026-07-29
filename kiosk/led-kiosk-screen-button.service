@@ -1,19 +1,18 @@
 # Install: sudo cp led-kiosk-screen-button.service /etc/systemd/system/
 #          sudo systemctl enable --now led-kiosk-screen-button
-# Needs an X session up first (xset talks to the X server on DISPLAY=:0),
-# and pi4 needs GPIO access -- see screen-button/README.md. Depends on
-# graphical.target rather than led-kiosk-browser.service specifically, since
-# this device may not have that unit installed (browser launched manually
-# instead) -- graphical.target is reached on boot on any Pi configured for
-# desktop auto-login either way.
+# Needs the Wayland session up first (wlr-randr talks to the labwc
+# compositor over WAYLAND_DISPLAY), and pi4 needs GPIO access -- see
+# screen-button/README.md. Depends on graphical.target rather than
+# led-kiosk-browser.service specifically, since this device may not have
+# that unit installed -- graphical.target is reached on boot on any Pi
+# configured for desktop auto-login either way.
 #
-# XAUTHORITY is required in addition to DISPLAY: unlike a process launched
-# from within the desktop session (which inherits the session's X cookie
-# automatically), a systemd *system* service has no X auth by default, so
-# xset would silently fail to connect even with DISPLAY set correctly.
-# /home/pi4/.Xauthority is the standard cookie file location for a classic
-# lightdm auto-login session -- confirm it exists (`ls -la ~pi4/.Xauthority`)
-# and adjust the path below if this device's display manager differs.
+# This device runs Wayland/labwc (confirmed on hardware: Raspberry Pi OS on
+# Debian 13 trixie), not X11 -- WAYLAND_DISPLAY/XDG_RUNTIME_DIR are required
+# the same way XAUTHORITY would be for an X11 service: a systemd *system*
+# service has no session context by default. wayland-0 and /run/user/1000
+# are this device's confirmed values (1000 = pi4's uid, check `id -u pi4`
+# if this is ever redeployed to a different user).
 [Unit]
 Description=LED kiosk screen on/off GPIO button
 After=graphical.target
@@ -21,8 +20,8 @@ After=graphical.target
 [Service]
 Type=simple
 User=pi4
-Environment=DISPLAY=:0
-Environment=XAUTHORITY=/home/pi4/.Xauthority
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=XDG_RUNTIME_DIR=/run/user/1000
 ExecStart=/home/pi4/led-kiosk/venv/bin/python /home/pi4/led-kiosk/kiosk/screen-button/screen_button.py
 Restart=on-failure
 RestartSec=3

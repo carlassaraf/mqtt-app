@@ -5,11 +5,11 @@ system shutdown involved, Chromium and the backend keep running the whole
 time. The touchscreen is a separate USB HID device, so it stays live
 regardless of the display's power state.
 
-Uses X11 DPMS (`xset dpms force off/on`) rather than `vcgencmd
-display_power`: DPMS is the driver-agnostic, X11-native way to blank a
-display and this kiosk is confirmed running X11 (see
-`kiosk/led-kiosk-browser.service`), whereas `vcgencmd display_power` is
-known to be unreliable on newer KMS video drivers.
+This device runs **Wayland with the `labwc` compositor** (confirmed on
+hardware: Raspberry Pi OS on Debian 13 trixie) — not X11. `wlr-randr`
+(already installed) is the Wayland-native way to power an output on/off;
+`xset`/DPMS, matchbox-window-manager, and `vcgencmd display_power` all
+assume the wrong stack for this device and don't apply here.
 
 ## Wiring
 
@@ -31,6 +31,7 @@ needed — `screen_button.py` enables GPIO17's internal pull-up.
 3. Install the systemd unit:
    ```
    sudo cp led-kiosk-screen-button.service /etc/systemd/system/
+   sudo systemctl daemon-reload
    sudo systemctl enable --now led-kiosk-screen-button
    ```
 
@@ -38,33 +39,35 @@ needed — `screen_button.py` enables GPIO17's internal pull-up.
 
 1. Press the button once while the kiosk is showing → the display should
    blank almost immediately. Confirm the backend/browser are still alive
-   underneath (`systemctl status led-kiosk-backend led-kiosk-browser`).
+   underneath (`systemctl status led-kiosk-backend`, `ps aux | grep -i chromium`).
 2. Press it again → the display should come back showing the live kiosk
    (not a reload).
 3. Touch the (still-live) touchscreen, or move a mouse if one's attached,
-   while the display is blanked → confirm the display wakes on its own,
-   with no button press needed. This is intended: X11's DPMS wakes the
-   display on any input event by default, and the `xset +dpms` the script
-   runs at startup is the only thing needed for that to work — no extra
-   config. The button remains available to manually blank the screen again
-   (or wake it) on demand.
+   while the display is blanked. **This is genuinely unconfirmed on this
+   stack** — X11's DPMS had built-in "any input wakes the display"
+   behavior, but there's no guarantee `labwc` reconnects wake-on-touch to
+   an output that was turned off *externally* via `wlr-randr` (as opposed
+   to via the compositor's own idle timeout, if it has one). If it doesn't
+   wake on its own, the fix is having `screen_button.py` itself watch the
+   touchscreen/mouse's evdev device and call `wlr-randr --output HDMI-A-1
+   --on` on activity while blanked — not implemented yet since it may not
+   be necessary; confirm the gap exists first before adding it.
 
 If the service is `active` but the button does nothing, check the logs
 while pressing it:
 ```
 journalctl -u led-kiosk-screen-button -f
 ```
-`xset: unable to open display ":0"` means `XAUTHORITY` is missing or wrong
-— the unit file sets it to `/home/pi4/.Xauthority` (the standard cookie
-location for a lightdm auto-login session); confirm that file actually
-exists (`ls -la ~pi4/.Xauthority`) and adjust the unit file if this device
-uses a different display manager. Also double check `DISPLAY=:0` matches
-the actual X session's display number, and that Raspberry Pi OS is
-configured to auto-login to the desktop on boot (`raspi-config` → System
-Options → Boot / Auto Login → Desktop Autologin) — this service only waits
-for `graphical.target`, not for the kiosk browser specifically, so it'll
-start even if the browser is being launched manually rather than via
-`led-kiosk-browser.service`.
+and separately confirm the command works when run by hand:
+```
+wlr-randr --output HDMI-A-1
+```
+If that errors (e.g. "failed to connect to compositor"), the service's
+`WAYLAND_DISPLAY=wayland-0` / `XDG_RUNTIME_DIR=/run/user/1000` values don't
+match this device's actual session — check `echo $WAYLAND_DISPLAY` and
+`ls $XDG_RUNTIME_DIR | grep wayland` from a shell within the real desktop
+session (e.g. over SSH after `export XDG_RUNTIME_DIR=/run/user/$(id -u)`)
+and update the unit file to match.
 
 If the logs show no error at all when the button is pressed, the daemon
 isn't seeing the GPIO event — double check the wiring (GPIO17/pin 11 to
