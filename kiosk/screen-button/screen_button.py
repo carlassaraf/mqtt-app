@@ -3,6 +3,7 @@
 Standalone (not part of the FastAPI app) since it needs GPIO access and must
 keep working independent of the backend/browser. See README.md for wiring
 and setup."""
+import re
 import subprocess
 from signal import pause
 
@@ -16,9 +17,19 @@ OUTPUT = "HDMI-A-1"  # confirmed via `wlr-randr` on this device -- re-check
 
 
 def _screen_is_on() -> bool:
-    result = subprocess.run(["wlr-randr", "--output", OUTPUT], capture_output=True, text=True)
-    is_on = "Enabled: yes" in result.stdout
-    print(f"[screen_button] state check: is_on={is_on} stdout={result.stdout!r} stderr={result.stderr!r}", flush=True)
+    # `wlr-randr --output X` with no action still lists *every* output
+    # (confirmed on hardware -- the --output filter only applies to
+    # actions like --on/--off, not to plain queries), including a
+    # synthetic "NOOP-1 Headless output" labwc creates as a fallback that
+    # is always "Enabled: yes". A naive substring search over the whole
+    # listing matches that placeholder instead of the real display, so
+    # this has to scope to OUTPUT's own block specifically: each output's
+    # block starts at a line with no leading whitespace, so split on that.
+    out = subprocess.run(["wlr-randr"], capture_output=True, text=True).stdout
+    blocks = re.split(r"\n(?=\S)", out)
+    block = next((b for b in blocks if b.startswith(OUTPUT)), "")
+    is_on = "Enabled: yes" in block
+    print(f"[screen_button] state check: is_on={is_on} block={block!r}", flush=True)
     return is_on
 
 
