@@ -50,7 +50,6 @@ body { display: flex; flex-direction: column; }
 }
 .icon-btn:active { background: var(--surface-2); }
 .update-app-btn:active { border-color: var(--accent); color: var(--accent); }
-.power-btn:active { border-color: var(--danger); color: var(--danger); }
 .close-app-btn:active { border-color: var(--danger); color: var(--danger); }
 
 .tabs {

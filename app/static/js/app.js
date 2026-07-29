@@ -113,18 +113,6 @@ document.getElementById("updateAppBtn").addEventListener("click", async () => {
   }
 });
 
-// ---------- power off ----------
-// To turn it back on, use the physical button wired to GPIO3 -- see
-// kiosk/power-button/README.md.
-document.getElementById("powerBtn").addEventListener("click", async () => {
-  if (!confirm("¿Apagar el equipo? Para volver a encenderlo vas a necesitar el botón físico.")) return;
-  try {
-    await fetch("/api/system/shutdown", { method: "POST" });
-  } catch {
-    // same as closeAppBtn -- the connection drops once the OS starts shutting down
-  }
-});
-
 // ---------- connectivity status ----------
 const NETWORK_LABELS = { wifi: "WiFi", lte: "LTE", ethernet: "Ethernet" };
 

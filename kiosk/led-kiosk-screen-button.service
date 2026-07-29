@@ -1,0 +1,20 @@
+# Install: sudo cp led-kiosk-screen-button.service /etc/systemd/system/
+#          sudo systemctl enable --now led-kiosk-screen-button
+# Needs the X session from led-kiosk-browser.service up first (xset talks to
+# the X server on DISPLAY=:0), and pi4 needs GPIO access -- see
+# screen-button/README.md.
+[Unit]
+Description=LED kiosk screen on/off GPIO button
+After=led-kiosk-browser.service
+Requires=led-kiosk-browser.service
+
+[Service]
+Type=simple
+User=pi4
+Environment=DISPLAY=:0
+ExecStart=/home/pi4/led-kiosk/venv/bin/python /home/pi4/led-kiosk/kiosk/screen-button/screen_button.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=graphical.target
