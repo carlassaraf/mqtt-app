@@ -16,12 +16,17 @@ OUTPUT = "HDMI-A-1"  # confirmed via `wlr-randr` on this device -- re-check
 
 
 def _screen_is_on() -> bool:
-    out = subprocess.run(["wlr-randr", "--output", OUTPUT], capture_output=True, text=True).stdout
-    return "Enabled: yes" in out
+    result = subprocess.run(["wlr-randr", "--output", OUTPUT], capture_output=True, text=True)
+    is_on = "Enabled: yes" in result.stdout
+    print(f"[screen_button] state check: is_on={is_on} stdout={result.stdout!r} stderr={result.stderr!r}", flush=True)
+    return is_on
 
 
 def toggle_screen():
-    subprocess.run(["wlr-randr", "--output", OUTPUT, "--off" if _screen_is_on() else "--on"])
+    action = "--off" if _screen_is_on() else "--on"
+    print(f"[screen_button] toggling: {action}", flush=True)
+    result = subprocess.run(["wlr-randr", "--output", OUTPUT, action], capture_output=True, text=True)
+    print(f"[screen_button] toggle result: returncode={result.returncode} stdout={result.stdout!r} stderr={result.stderr!r}", flush=True)
 
 
 if __name__ == "__main__":
