@@ -12,8 +12,7 @@
 # first if `nmcli device status` doesn't show a gsm/wwan device.
 #
 # Run as root (sudo) on the Pi itself. UNVERIFIED against real hardware --
-# review before running, especially the WiFi connection auto-detection and
-# the route-metric values.
+# review before running, especially the route-metric values.
 set -euo pipefail
 
 APN="datos.personal.com"
@@ -57,18 +56,21 @@ nmcli connection modify lte-backup \
   ipv4.route-metric "$LTE_METRIC" \
   ipv6.route-metric "$LTE_METRIC"
 
-WIFI_CON=$(nmcli -t -f NAME,TYPE connection show | awk -F: '$2=="wifi"{print $1; exit}')
-if [ -z "$WIFI_CON" ]; then
-  echo "No existing WiFi connection profile found -- set one up first" >&2
-  echo "(raspi-config or nmcli), then re-run this script so its route" >&2
-  echo "metric gets set too." >&2
-else
-  echo "Setting route metric on WiFi profile '${WIFI_CON}' (preferred over LTE)..."
-  nmcli connection modify "$WIFI_CON" \
-    connection.autoconnect yes \
-    ipv4.route-metric "$WIFI_METRIC" \
-    ipv6.route-metric "$WIFI_METRIC"
-fi
+echo "Setting WiFi route metric as a device-type default (${WIFI_METRIC})..."
+# A device-type default in conf.d, not a specific connection profile: this
+# kiosk may be pointed at different SSIDs over its lifetime (home network,
+# phone hotspot, site WiFi, ...), and whichever one is actually active
+# needs to win over LTE. Modifying a single detected profile (the old
+# approach here) silently stops working the moment a different network is
+# used instead.
+mkdir -p /etc/NetworkManager/conf.d
+cat > /etc/NetworkManager/conf.d/99-wifi-metric.conf <<EOF
+[connection-wifi-metric]
+match-device=type:wifi
+ipv4.route-metric=${WIFI_METRIC}
+ipv6.route-metric=${WIFI_METRIC}
+EOF
+systemctl restart NetworkManager
 
 echo "Bringing lte-backup up..."
 nmcli connection up lte-backup || {
