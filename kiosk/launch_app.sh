@@ -10,11 +10,13 @@
 # Doubles as the "restore" path for the in-app minimize button
 # (app/routes/system.py minimize_browser()): if Chromium is already running
 # (just hidden, not killed), re-show and focus that window instead of
-# launching a second one.
+# launching a second one. Uses wlrctl (Wayland/labwc, confirmed on
+# hardware) -- `wlrctl toplevel focus chromium` un-minimizes and focuses
+# in one call, confirmed working directly on-device.
 APP_DIR="$HOME/led-kiosk"
 
 if pgrep -f chromium > /dev/null; then
-  xdotool search --class chromium windowmap windowactivate
+  wlrctl toplevel focus chromium
   exit 0
 fi
 

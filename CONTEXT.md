@@ -129,23 +129,30 @@ config.example.json               copy to config.json, already has real broker/t
    and USB mode-switch command. `/api/status` now also reports
    `network_type` (wifi/lte/ethernet/unknown) and the UI shows it next to
    the MQTT status.
-2. **Kiosk lockdown** — systemd units are written but unverified: need
-   auto-login + minimal WM on the Pi, and ideally overlayfs/read-only root.
-3. **Screen on/off button** (`kiosk/screen-button/`) — a `gpiozero` daemon on
-   GPIO17 toggles the HDMI display via X11 DPMS (`xset dpms force off/on`)
-   on each press; touchscreen (USB, separate from the display) stays live
-   throughout, and wakes the display on touch/mouse input by default (X11's
-   normal DPMS behavior — intentional, not yet confirmed on hardware).
+2. **Kiosk lockdown** — **confirmed on hardware**: this device runs
+   Wayland with the `labwc` compositor (Raspberry Pi OS on Debian 13
+   trixie), not X11/matchbox as earlier docs in this repo assumed. It's
+   also not confirmed that Chromium is actually launched via
+   `kiosk/start_kiosk.sh`/`led-kiosk-browser.service` on the live device —
+   the running process has flags those scripts don't set, suggesting
+   Raspberry Pi OS's own built-in kiosk-mode boot option may be what's
+   actually in use. Worth confirming with the client before relying on
+   this repo's own browser-launch scripts, and ideally revisiting
+   `start_kiosk.sh` to match whatever's actually deployed. Read-only root /
+   overlayfs still not done either.
+3. **Screen on/off button** (`kiosk/screen-button/`) — a `gpiozero` daemon
+   on GPIO17 toggles the HDMI output (`HDMI-A-1`, confirmed via
+   `wlr-randr`) on each press; touchscreen (USB, separate from the
+   display) stays live throughout. **Unconfirmed**: whether touch/mouse
+   input wakes a display that was blanked via `wlr-randr` — X11's DPMS
+   guaranteed this, Wayland/labwc doesn't necessarily (see the folder's
+   README for the fallback if it turns out not to work).
 4. **Minimize button** (topbar, `app/routes/system.py` `minimize_browser()`)
-   — hides the Chromium window via `xdotool` without killing it; restoring
-   is done by double-clicking the existing desktop launcher icon
-   (`kiosk/launch_app.sh` now detects the still-running process and
-   un-hides/activates it instead of relaunching). Requires
-   `sudo apt install xdotool` on-device. **Genuinely unverified** whether
-   `matchbox-window-manager` (partial EWMH support, no taskbar) actually
-   honors the iconify/hide request — needs a hardware test before relying
-   on it; fallback if it doesn't work is either `wmctrl` instead of
-   `xdotool`, or redefining "minimize" as the screen-button's DPMS blank.
+   — **confirmed working on hardware**: `wlrctl toplevel minimize chromium`
+   hides the window, `wlrctl toplevel focus chromium` (used in
+   `kiosk/launch_app.sh`'s restore path) un-hides and refocuses it.
+   Requires `sudo apt install wlrctl` on-device — not yet added to any
+   automated setup step/README, only confirmed manually so far.
 5. **LoRa transport** — deferred by design, see architecture note above for
    how it should slot in.
 6. Decide whether SMS notification visibility belongs in the UI (open
