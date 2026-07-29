@@ -6,6 +6,14 @@
 # this device may not have that unit installed (browser launched manually
 # instead) -- graphical.target is reached on boot on any Pi configured for
 # desktop auto-login either way.
+#
+# XAUTHORITY is required in addition to DISPLAY: unlike a process launched
+# from within the desktop session (which inherits the session's X cookie
+# automatically), a systemd *system* service has no X auth by default, so
+# xset would silently fail to connect even with DISPLAY set correctly.
+# /home/pi4/.Xauthority is the standard cookie file location for a classic
+# lightdm auto-login session -- confirm it exists (`ls -la ~pi4/.Xauthority`)
+# and adjust the path below if this device's display manager differs.
 [Unit]
 Description=LED kiosk screen on/off GPIO button
 After=graphical.target
@@ -14,6 +22,7 @@ After=graphical.target
 Type=simple
 User=pi4
 Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/pi4/.Xauthority
 ExecStart=/home/pi4/led-kiosk/venv/bin/python /home/pi4/led-kiosk/kiosk/screen-button/screen_button.py
 Restart=on-failure
 RestartSec=3

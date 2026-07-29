@@ -49,11 +49,23 @@ needed — `screen_button.py` enables GPIO17's internal pull-up.
    config. The button remains available to manually blank the screen again
    (or wake it) on demand.
 
-If `xset` reports an error like "unable to open display", double check
-`DISPLAY=:0` matches the actual X session's display number (usually `:0`
-on a Pi with a single auto-login desktop session) and that Raspberry Pi OS
-is configured to auto-login to that desktop on boot (`raspi-config` →
-System Options → Boot / Auto Login → Desktop Autologin) — this service
-only waits for `graphical.target`, not for the kiosk browser specifically,
-so it'll start even if the browser is being launched manually rather than
-via `led-kiosk-browser.service`.
+If the service is `active` but the button does nothing, check the logs
+while pressing it:
+```
+journalctl -u led-kiosk-screen-button -f
+```
+`xset: unable to open display ":0"` means `XAUTHORITY` is missing or wrong
+— the unit file sets it to `/home/pi4/.Xauthority` (the standard cookie
+location for a lightdm auto-login session); confirm that file actually
+exists (`ls -la ~pi4/.Xauthority`) and adjust the unit file if this device
+uses a different display manager. Also double check `DISPLAY=:0` matches
+the actual X session's display number, and that Raspberry Pi OS is
+configured to auto-login to the desktop on boot (`raspi-config` → System
+Options → Boot / Auto Login → Desktop Autologin) — this service only waits
+for `graphical.target`, not for the kiosk browser specifically, so it'll
+start even if the browser is being launched manually rather than via
+`led-kiosk-browser.service`.
+
+If the logs show no error at all when the button is pressed, the daemon
+isn't seeing the GPIO event — double check the wiring (GPIO17/pin 11 to
+GND) and that `pi4` is in the `gpio` group.
