@@ -41,14 +41,13 @@ needed — `screen_button.py` enables GPIO17's internal pull-up.
    underneath (`systemctl status led-kiosk-backend led-kiosk-browser`).
 2. Press it again → the display should come back showing the live kiosk
    (not a reload).
-3. Touch the (still-live) touchscreen while the display is blanked. X11's
-   default DPMS behavior wakes the display on any input event, which would
-   fight this button (a stray touch turning the screen back on instead of
-   only the button doing it). If that happens, the fix is to have X ignore
-   input for DPMS purposes on this touchscreen device, or simplest: leave
-   it as expected/acceptable behavior if a touch-to-wake is actually fine
-   for how the kiosk will be used — worth deciding with the client after
-   testing on the real hardware rather than pre-emptively working around it.
+3. Touch the (still-live) touchscreen, or move a mouse if one's attached,
+   while the display is blanked → confirm the display wakes on its own,
+   with no button press needed. This is intended: X11's DPMS wakes the
+   display on any input event by default, and the `xset +dpms` the script
+   runs at startup is the only thing needed for that to work — no extra
+   config. The button remains available to manually blank the screen again
+   (or wake it) on demand.
 
 If `xset` reports an error like "unable to open display", double check
 `DISPLAY=:0` matches the browser's session and that this service starts

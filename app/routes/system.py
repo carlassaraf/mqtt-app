@@ -30,3 +30,16 @@ def update_app():
     script = ROOT / "kiosk" / "update_app.sh"
     subprocess.Popen([str(script)], start_new_session=True)
     return {"status": "updating"}
+
+
+@router.post("/minimize")
+def minimize_browser():
+    """Hides the Chromium window without killing it (unlike quit_browser,
+    which pkills it). Restoring happens outside this app entirely -- see
+    kiosk/launch_app.sh, which detects the still-running process and
+    un-hides/activates it instead of relaunching. Untested against
+    matchbox-window-manager's partial EWMH support -- see
+    kiosk/screen-button/ sibling docs for the general X11/matchbox caveats
+    on this device."""
+    subprocess.run(["xdotool", "search", "--class", "chromium", "windowminimize"], check=False)
+    return {"status": "minimized"}

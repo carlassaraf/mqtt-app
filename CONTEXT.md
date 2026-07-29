@@ -134,12 +134,21 @@ config.example.json               copy to config.json, already has real broker/t
 3. **Screen on/off button** (`kiosk/screen-button/`) — a `gpiozero` daemon on
    GPIO17 toggles the HDMI display via X11 DPMS (`xset dpms force off/on`)
    on each press; touchscreen (USB, separate from the display) stays live
-   throughout. Written, not yet verified against physical hardware — in
-   particular whether X11's default DPMS-wake-on-touch-input fights the
-   button (see the folder's README).
-4. **LoRa transport** — deferred by design, see architecture note above for
+   throughout, and wakes the display on touch/mouse input by default (X11's
+   normal DPMS behavior — intentional, not yet confirmed on hardware).
+4. **Minimize button** (topbar, `app/routes/system.py` `minimize_browser()`)
+   — hides the Chromium window via `xdotool` without killing it; restoring
+   is done by double-clicking the existing desktop launcher icon
+   (`kiosk/launch_app.sh` now detects the still-running process and
+   un-hides/activates it instead of relaunching). Requires
+   `sudo apt install xdotool` on-device. **Genuinely unverified** whether
+   `matchbox-window-manager` (partial EWMH support, no taskbar) actually
+   honors the iconify/hide request — needs a hardware test before relying
+   on it; fallback if it doesn't work is either `wmctrl` instead of
+   `xdotool`, or redefining "minimize" as the screen-button's DPMS blank.
+5. **LoRa transport** — deferred by design, see architecture note above for
    how it should slot in.
-5. Decide whether SMS notification visibility belongs in the UI (open
+6. Decide whether SMS notification visibility belongs in the UI (open
    question for the client, not yet decided either way).
 
 ## Local dev

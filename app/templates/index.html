@@ -9,8 +9,15 @@
 <body>
 
 <header class="topbar">
-  <h1>COLUMNAS INTELIGENTES</h1>
-  <div class="topbar-right">
+  <div class="topbar-top">
+    <h1>COLUMNAS INTELIGENTES</h1>
+    <div class="topbar-actions">
+      <button class="icon-btn minimize-app-btn" id="minimizeAppBtn" aria-label="Minimizar aplicación">&minus;</button>
+      <button class="icon-btn update-app-btn" id="updateAppBtn" aria-label="Actualizar aplicación">&#8635;</button>
+      <button class="icon-btn close-app-btn" id="closeAppBtn" aria-label="Cerrar aplicación">&times;</button>
+    </div>
+  </div>
+  <div class="topbar-info">
     <div class="meta">
       <span class="clock" id="clock"></span>
       <span class="version">{{ version }}</span>
@@ -19,8 +26,6 @@
       <span class="status-dot" id="statusDot"></span>
       <span id="statusText">conectando…</span>
     </div>
-    <button class="icon-btn update-app-btn" id="updateAppBtn" aria-label="Actualizar aplicación">&#8635;</button>
-    <button class="icon-btn close-app-btn" id="closeAppBtn" aria-label="Cerrar aplicación">&times;</button>
   </div>
 </header>
 

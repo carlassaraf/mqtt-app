@@ -87,6 +87,15 @@ document.addEventListener("focusin", (e) => {
   keypadBackdrop.classList.add("open");
 });
 
+// ---------- minimize app ----------
+// Hides the Chromium window without killing it. Restoring happens outside
+// this page entirely (double-click the desktop launcher icon -- see
+// kiosk/launch_app.sh) since a button inside a hidden window is unreachable.
+// No confirm() -- unlike close/update, this isn't destructive.
+document.getElementById("minimizeAppBtn").addEventListener("click", async () => {
+  await fetch("/api/system/minimize", { method: "POST" });
+});
+
 // ---------- close app ----------
 // Chromium runs with --kiosk (no window chrome), so this button is the only
 // way for the client to get back to the Pi's desktop.
