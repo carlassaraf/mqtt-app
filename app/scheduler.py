@@ -15,7 +15,7 @@ from datetime import datetime
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from app import db
+from app import db, network_status
 from app.mqtt_client import is_connected, publish_command
 
 logger = logging.getLogger("scheduler")
@@ -42,6 +42,10 @@ MISSED_SCHEDULE_CATCHUP_S = 16 * 3600
 # still False, and publish_command() would otherwise fail immediately.
 CATCHUP_CONNECT_TIMEOUT_S = 30
 CATCHUP_POLL_INTERVAL_S = 1
+
+# How often to poll for a WiFi/LTE interface change, to SMS the client when
+# the kiosk fails over (see network_status.check_interface_change()).
+NETWORK_POLL_INTERVAL_S = 30
 
 
 def _run_job(schedule_id: int, commands: list[dict]):
@@ -83,6 +87,12 @@ def remove_scheduled_command(schedule_id: int):
 
 def start():
     scheduler.start()
+    scheduler.add_job(
+        network_status.check_interface_change,
+        "interval",
+        seconds=NETWORK_POLL_INTERVAL_S,
+        id="network-watch",
+    )
     _rearm_pending()
 
 

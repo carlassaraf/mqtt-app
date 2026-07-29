@@ -13,6 +13,8 @@ app/
   db.py              sqlite: logs + scheduled_commands tables
   mqtt_client.py      paho-mqtt wrapper: subscribe, log, publish, websocket fan-out
   scheduler.py        APScheduler wrapper, persisted via sqlite, re-arms on restart
+  network_status.py    active-interface detection (wifi/lte/ethernet) + change polling
+  sms.py               AT-command SMS notifications over the A7600 modem
   models.py            request/response pydantic models
   routes/
     commands.py        GET profile, POST send command
@@ -95,6 +97,27 @@ entirely and always sends that exact value; pair it with `"confirm": true` +
   (`led-kiosk-controller`) on purpose. Don't change it to match the
   device's, or one of the two will get disconnected by the broker.
 
+## SMS notifications (`app/sms.py`)
+
+Independent of the device's own SMS channel above, this app sends its own
+SMS over the A7600's AT port when it launches and connects to the broker,
+whenever it connects/disconnects again afterward, and whenever the active
+network interface changes (WiFi ↔ LTE). See `kiosk/network/README.md`'s
+"SMS notifications" section for the full wiring, including the one-time
+sudoers setup needed so the app can briefly free up the shared AT port from
+`lte-backup`.
+
+Recipient numbers are read from the `SMS_NOTIFY_NUMBERS` env var (comma
+separated, e.g. `+5491122334455,+5491166778899`) rather than config.json,
+so they're never committed to the repo:
+
+```bash
+export SMS_NOTIFY_NUMBERS="+5491122334455,+5491166778899"   # local dev
+```
+
+On the Pi, `kiosk/led-kiosk-backend.service` instead loads it from
+`/etc/led-kiosk.env` (root-owned, outside the repo) via `EnvironmentFile`.
+
 ## Deploying to the Pi (outline)
 
 1. `git clone` (or copy) this folder to `/home/pi/led-kiosk`.
@@ -104,7 +127,11 @@ entirely and always sends that exact value; pair it with `"confirm": true` +
 4. Set up WiFi/LTE failover at the OS level (NetworkManager + ModemManager
    for the A7600, WiFi as the lower-metric/preferred route) -- this app just
    reads connectivity status, it doesn't manage the interfaces itself.
-5. Install the two systemd services in `kiosk/` and enable them.
+5. Install the two systemd services in `kiosk/` and enable them. Create
+   `/etc/led-kiosk.env` with `SMS_NOTIFY_NUMBERS=...` (see "SMS
+   notifications" above) before starting `led-kiosk-backend`, and install
+   the sudoers rule from `kiosk/network/uart-ppp/sudoers-led-kiosk-sms` if
+   the UART LTE failover path is in use.
 6. Configure auto-login to a minimal desktop session (raspi-config) so
    Chromium has something to run in, and consider `systemctl mask
    getty@tty2` etc. plus an overlay/read-only root filesystem so the client
@@ -136,7 +163,8 @@ entirely and always sends that exact value; pair it with `"confirm": true` +
   changes needed to the UI, the profile schema, or the scheduler.
 - **Auth.** There's no login on the API/UI. Fine on an isolated kiosk device;
   add something before exposing this beyond localhost.
-- **A7600 AT-command integration.** Connectivity is handled at the OS level
-  (NetworkManager/ModemManager), not from within this app. The `/api/status`
-  endpoint only reports MQTT connection state right now -- extend it if you
-  want the UI to show WiFi vs LTE state too.
+- ~~**A7600 AT-command integration.**~~ Partly done: `app/sms.py` now sends
+  SMS over the modem's AT port on MQTT connect/disconnect and WiFi↔LTE
+  failover (see "SMS notifications" below and
+  `kiosk/network/README.md`). Interface management itself is still OS-level
+  (NetworkManager/ModemManager/pppd), not this app's job.

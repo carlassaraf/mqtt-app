@@ -6,6 +6,12 @@
 # window-management tool. wayland-0 and /run/user/1000 are this device's
 # confirmed values (1000 = pi4's uid, check `id -u pi4` if redeployed to a
 # different user).
+# EnvironmentFile carries SMS_NOTIFY_NUMBERS (see app/sms.py) in from a
+# file that's NOT part of this repo, so the numbers never get committed --
+# create /etc/led-kiosk.env (root-owned, chmod 600) with a line like
+# SMS_NOTIFY_NUMBERS=+5491122334455,+5491166778899
+# The leading "-" makes it optional, so the service still starts (just
+# without SMS) if that file hasn't been created yet.
 [Unit]
 Description=LED kiosk FastAPI backend
 After=network-online.target
@@ -16,6 +22,7 @@ Type=simple
 User=pi4
 Environment=WAYLAND_DISPLAY=wayland-0
 Environment=XDG_RUNTIME_DIR=/run/user/1000
+EnvironmentFile=-/etc/led-kiosk.env
 WorkingDirectory=/home/pi4/led-kiosk
 ExecStart=/home/pi4/led-kiosk/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
 Restart=on-failure

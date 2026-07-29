@@ -122,3 +122,29 @@ verbose chat output: `sudo pppd call lte-backup nodetach debug`.
 - Both links are meant to autoconnect and stay up simultaneously — this is
   not "connect LTE on demand," so expect the LTE radio to always be
   active. That's a fine tradeoff for a mains-powered kiosk.
+
+## SMS notifications (`app/sms.py`)
+
+The app itself (not just the device) now sends SMS notifications on MQTT
+connect/disconnect and on WiFi↔LTE failover, over this same modem's AT
+port. It's hardcoded to the UART wiring above (`/dev/serial0` @ 115200) —
+update `app/sms.py`'s `_PORT`/`_BAUDRATE` if this device ever moves to the
+USB/QMI path instead.
+
+**Port contention:** there's only one AT port on the UART wiring, and
+`lte-backup` (above) holds it open continuously as the PPP data link.
+Sending AT+CMGS on the same port while pppd is mid-session would race
+pppd's own reads/writes and can corrupt both the SMS command and the live
+link — so `app/sms.py` stops `lte-backup`, sends, then restarts it (a few
+seconds' connectivity blip) whenever it's active. That needs a passwordless
+sudo rule for the user the backend runs as:
+
+```
+sudo cp uart-ppp/sudoers-led-kiosk-sms /etc/sudoers.d/led-kiosk-sms
+sudo chmod 440 /etc/sudoers.d/led-kiosk-sms
+sudo visudo -c
+```
+
+**Recipient numbers** come from the `SMS_NOTIFY_NUMBERS` env var (comma
+separated), deliberately kept out of this repo — see the `EnvironmentFile`
+note in `../led-kiosk-backend.service`.
