@@ -37,9 +37,12 @@ def minimize_browser():
     """Hides the Chromium window without killing it (unlike quit_browser,
     which pkills it). Restoring happens outside this app entirely -- see
     kiosk/launch_app.sh, which detects the still-running process and
-    un-hides/activates it instead of relaunching. Untested against
-    matchbox-window-manager's partial EWMH support -- see
-    kiosk/screen-button/ sibling docs for the general X11/matchbox caveats
-    on this device."""
-    subprocess.run(["xdotool", "search", "--class", "chromium", "windowminimize"], check=False)
+    un-hides/activates it instead of relaunching. Uses windowunmap rather
+    than windowminimize: minimize relies on ICCCM WM_CHANGE_STATE/iconify
+    support from the window manager, which matchbox-window-manager (the
+    one this kiosk runs -- see led-kiosk-browser.service) doesn't
+    implement, so the button did nothing. windowunmap hides the window
+    directly via X11 without needing WM cooperation, and pairs with the
+    windowmap already used to restore it in launch_app.sh."""
+    subprocess.run(["xdotool", "search", "--class", "chromium", "windowunmap"], check=False)
     return {"status": "minimized"}

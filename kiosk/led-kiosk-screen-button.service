@@ -1,12 +1,14 @@
 # Install: sudo cp led-kiosk-screen-button.service /etc/systemd/system/
 #          sudo systemctl enable --now led-kiosk-screen-button
-# Needs the X session from led-kiosk-browser.service up first (xset talks to
-# the X server on DISPLAY=:0), and pi4 needs GPIO access -- see
-# screen-button/README.md.
+# Needs an X session up first (xset talks to the X server on DISPLAY=:0),
+# and pi4 needs GPIO access -- see screen-button/README.md. Depends on
+# graphical.target rather than led-kiosk-browser.service specifically, since
+# this device may not have that unit installed (browser launched manually
+# instead) -- graphical.target is reached on boot on any Pi configured for
+# desktop auto-login either way.
 [Unit]
 Description=LED kiosk screen on/off GPIO button
-After=led-kiosk-browser.service
-Requires=led-kiosk-browser.service
+After=graphical.target
 
 [Service]
 Type=simple

@@ -50,6 +50,10 @@ needed — `screen_button.py` enables GPIO17's internal pull-up.
    (or wake it) on demand.
 
 If `xset` reports an error like "unable to open display", double check
-`DISPLAY=:0` matches the browser's session and that this service starts
-after `led-kiosk-browser.service` (already set via `After=`/`Requires=`
-above).
+`DISPLAY=:0` matches the actual X session's display number (usually `:0`
+on a Pi with a single auto-login desktop session) and that Raspberry Pi OS
+is configured to auto-login to that desktop on boot (`raspi-config` →
+System Options → Boot / Auto Login → Desktop Autologin) — this service
+only waits for `graphical.target`, not for the kiosk browser specifically,
+so it'll start even if the browser is being launched manually rather than
+via `led-kiosk-browser.service`.
