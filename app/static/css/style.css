@@ -114,9 +114,9 @@ main { padding: 24px 28px 100px; flex: 1 1 auto; min-height: 0; overflow-y: auto
 .schedule-item {
   display: flex; align-items: center; justify-content: space-between;
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 14px 18px; margin-bottom: 10px; font-size: 14px;
+  padding: 14px 18px; margin-bottom: 10px; font-size: 26px;
 }
-.schedule-item .meta { color: var(--text-dim); font-size: 13px; }
+.schedule-item .meta { color: var(--text-dim); font-size: 26px; }
 .btn-cancel {
   background: none; border: 1px solid var(--danger); color: var(--danger);
   border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer;
