@@ -18,21 +18,48 @@ Momentary push button between **GPIO17 (physical pin 11)** and any **GND**
 (see `kiosk/network/`), so GPIO17 avoids that conflict. No pull resistor
 needed — `screen_button.py` enables GPIO17's internal pull-up.
 
-## Setup
+## Setup (fresh device, in order)
 
-1. `gpiozero`/`RPi.GPIO` are in `requirements.txt` (Linux-only markers, so
-   they're skipped on non-Pi dev machines) — a normal
-   `venv/bin/pip install -r requirements.txt` on the Pi already covers them.
-2. Confirm `pi4` can access GPIO without root — on Raspberry Pi OS this is
-   normally granted via the `gpio` group:
+Each step below exists because skipping it caused a real failure the first
+time this was set up — follow them in order rather than jumping to step 2.
+
+1. **System packages** — `lgpio`'s Python bindings compile a C extension
+   that needs both a SWIG-based build tool and the underlying C library's
+   dev headers to link against; `wlr-randr` is normally preinstalled on the
+   Wayland desktop image but costs nothing to make explicit:
+   ```
+   sudo apt update
+   sudo apt install swig liblgpio-dev wlr-randr -y
+   ```
+2. **Python packages**:
+   ```
+   cd ~/led-kiosk
+   venv/bin/pip install -r requirements.txt
+   ```
+   This installs `gpiozero`, `RPi.GPIO`, and `lgpio` (all Linux-only
+   markers, so this step is skipped on non-Pi dev machines). Only `lgpio`
+   actually matters at runtime here: on Raspberry Pi OS Bookworm/trixie,
+   `gpiozero`'s older `RPi.GPIO` backend fails outright with
+   `RuntimeError: Failed to add edge detection` (the newer kernel GPIO
+   character-device interface isn't compatible with `RPi.GPIO`'s
+   edge-detection mechanism) — `gpiozero` prefers `lgpio` automatically
+   once it's installed, which is why step 1 has to happen first, or this
+   install fails to build it and silently falls back to the broken
+   backend instead.
+3. **GPIO group membership** — confirm `pi4` can access GPIO without root:
    ```
    groups pi4   # should list "gpio"; if not: sudo usermod -aG gpio pi4
    ```
-3. Install the systemd unit:
+   then log out/in (or reboot) for the group change to take effect.
+4. **Install the systemd unit** (the shipped file already sets the
+   `WAYLAND_DISPLAY`/`XDG_RUNTIME_DIR`/`WorkingDirectory` values this
+   device needs — see the unit file's own comments for why each one
+   matters):
    ```
    sudo cp led-kiosk-screen-button.service /etc/systemd/system/
    sudo systemctl daemon-reload
    sudo systemctl enable --now led-kiosk-screen-button
+   sudo systemctl status led-kiosk-screen-button   # should be active, no restart loop
    ```
 
 ## Verifying

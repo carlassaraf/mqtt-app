@@ -7,3 +7,4 @@ python-multipart==0.0.*
 pydantic==2.9.*
 gpiozero==2.0.*; sys_platform == "linux"
 RPi.GPIO==0.7.*; sys_platform == "linux"
+lgpio==0.2.*; sys_platform == "linux"

@@ -13,6 +13,13 @@
 # service has no session context by default. wayland-0 and /run/user/1000
 # are this device's confirmed values (1000 = pi4's uid, check `id -u pi4`
 # if this is ever redeployed to a different user).
+#
+# WorkingDirectory matters here too: gpiozero's preferred lgpio backend
+# creates a small notification pipe file (.lgd-nfyN) in the process's cwd,
+# and a systemd service with no WorkingDirectory defaults to cwd=/, which
+# pi4 can't write to -- confirmed on hardware (gpiozero silently fell back
+# to the older RPi.GPIO backend, which then fails outright on this kernel
+# with "Failed to add edge detection").
 [Unit]
 Description=LED kiosk screen on/off GPIO button
 After=graphical.target
@@ -22,6 +29,7 @@ Type=simple
 User=pi4
 Environment=WAYLAND_DISPLAY=wayland-0
 Environment=XDG_RUNTIME_DIR=/run/user/1000
+WorkingDirectory=/home/pi4/led-kiosk
 ExecStart=/home/pi4/led-kiosk/venv/bin/python /home/pi4/led-kiosk/kiosk/screen-button/screen_button.py
 Restart=on-failure
 RestartSec=3
