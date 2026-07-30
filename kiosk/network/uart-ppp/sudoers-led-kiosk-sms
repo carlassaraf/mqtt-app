@@ -1,7 +1,0 @@
-# Lets the kiosk backend (running as pi4, see ../../led-kiosk-backend.service)
-# stop/start lte-backup without a password, so app/sms.py can free up
-# /dev/serial0 for AT+CMGS while the PPP link is up, then hand it back.
-# Install: sudo cp sudoers-led-kiosk-sms /etc/sudoers.d/led-kiosk-sms
-#          sudo chmod 440 /etc/sudoers.d/led-kiosk-sms
-#          sudo visudo -c   # validates syntax before it takes effect
-pi4 ALL=(root) NOPASSWD: /usr/bin/systemctl stop lte-backup, /usr/bin/systemctl start lte-backup

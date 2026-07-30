@@ -14,7 +14,6 @@ import logging
 
 import paho.mqtt.client as mqtt
 
-from app import sms
 from app.config import MQTT_CFG
 from app.db import insert_log
 
@@ -53,7 +52,6 @@ def _on_connect(client, userdata, flags, reason_code, properties=None):
     if _connected:
         logger.info("MQTT connected, subscribing to %s", MQTT_CFG["log_topic"])
         client.subscribe(MQTT_CFG["log_topic"], qos=MQTT_CFG.get("qos", 1))
-        sms.send_sms("Kiosk: conectado al broker MQTT")
     else:
         logger.error("MQTT connect failed: %s", reason_code)
 
@@ -62,7 +60,6 @@ def _on_disconnect(client, userdata, reason_code, properties=None):
     global _connected
     _connected = False
     logger.warning("MQTT disconnected: %s", reason_code)
-    sms.send_sms("Kiosk: desconectado del broker MQTT")
 
 
 def _on_message(client, userdata, msg):
