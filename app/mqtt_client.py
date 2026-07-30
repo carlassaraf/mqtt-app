@@ -58,7 +58,7 @@ def _on_connect(client, userdata, flags, reason_code, properties=None):
         logger.error("MQTT connect failed: %s", reason_code)
 
 
-def _on_disconnect(client, userdata, disconnect_flags, reason_code, properties=None):
+def _on_disconnect(client, userdata, reason_code, properties=None):
     global _connected
     _connected = False
     logger.warning("MQTT disconnected: %s", reason_code)
