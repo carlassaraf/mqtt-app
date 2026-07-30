@@ -256,6 +256,16 @@ function renderValueField(cmd) {
     return { el: wrap, getValue: () => Number(select.value) };
   }
 
+  // Like "toggle" but with device-specific on/off wording and values instead
+  // of a raw 1/0 choice -- e.g. OUT is active-low (OUT0 = encendido), which
+  // "Encendido (1)/Apagado (0)" would misrepresent.
+  if (cmd.value_type === "on_off") {
+    const select = document.createElement("select");
+    select.innerHTML = `<option value="${cmd.on_value}">${cmd.on_label}</option><option value="${cmd.off_value}">${cmd.off_label}</option>`;
+    wrap.appendChild(select);
+    return { el: wrap, getValue: () => Number(select.value) };
+  }
+
   // fallback: plain text
   const input = document.createElement("input");
   input.type = "text";
@@ -477,13 +487,14 @@ const SCHEDULE_STATES = {
     // doesn't interact with any other mode, so this is the one state that's
     // just its own single command, no AUT/BRI/BLK/ROT bundled in.
     fields(container) {
-      const out = appendField(container, getCmd("OUT"));
+      const cmd = getCmd("OUT");
+      const out = appendField(container, cmd);
 
       return () => {
         const value = out.getValue();
         return {
           commands: [{ command_id: "OUT", value }],
-          label: `Luminaria ${value === 1 ? "encendida" : "apagada"}`,
+          label: `Luminaria ${value === cmd.on_value ? "encendida" : "apagada"}`,
         };
       };
     },
