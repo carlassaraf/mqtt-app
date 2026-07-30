@@ -46,14 +46,20 @@ body { display: flex; flex-direction: column; }
 
 .icon-btn {
   width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--border);
-  background: var(--surface); color: var(--text-dim); font-size: 22px; line-height: 1;
+  background: var(--bg); color: var(--text); font-size: 22px; line-height: 1;
   cursor: pointer; display: flex; align-items: center; justify-content: center;
   appearance: none; -webkit-appearance: none;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
 }
-.icon-btn:active { background: var(--surface-2); }
-.minimize-app-btn:active { border-color: var(--accent); color: var(--accent); }
-.update-app-btn:active { border-color: var(--accent); color: var(--accent); }
-.close-app-btn:active { border-color: var(--danger); color: var(--danger); }
+/* :hover covers mouse use (dev/testing); :active covers the kiosk touchscreen,
+   which never fires :hover -- both get the same highlighted look. */
+.minimize-app-btn:hover, .minimize-app-btn:active,
+.update-app-btn:hover, .update-app-btn:active {
+  background: var(--accent); border-color: var(--accent); color: var(--bg);
+}
+.close-app-btn:hover, .close-app-btn:active {
+  background: var(--danger); border-color: var(--danger); color: var(--bg);
+}
 
 .tabs {
   display: flex; gap: 4px; padding: 10px 16px 0; border-bottom: 1px solid var(--border);
