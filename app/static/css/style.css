@@ -45,8 +45,8 @@ body { display: flex; flex-direction: column; }
 .status-dot.connected { background: var(--accent); }
 
 .icon-btn {
-  width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--border);
-  background: var(--bg); color: var(--text); font-size: 22px; line-height: 1;
+  width: 60px; height: 60px; border-radius: 50%; border: 1px solid var(--border);
+  background: var(--bg); color: var(--text); font-size: 28px; line-height: 1;
   cursor: pointer; display: flex; align-items: center; justify-content: center;
   appearance: none; -webkit-appearance: none;
   transition: background .15s ease, border-color .15s ease, color .15s ease;
