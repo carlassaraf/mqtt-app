@@ -256,9 +256,8 @@ function renderValueField(cmd) {
     return { el: wrap, getValue: () => Number(select.value) };
   }
 
-  // Like "toggle" but with device-specific on/off wording and values instead
-  // of a raw 1/0 choice -- e.g. OUT is active-low (OUT0 = encendido), which
-  // "Encendido (1)/Apagado (0)" would misrepresent.
+  // Like "toggle" but with device-specific on/off wording instead of a raw
+  // "Encendido (1)/Apagado (0)" choice.
   if (cmd.value_type === "on_off") {
     const select = document.createElement("select");
     select.innerHTML = `<option value="${cmd.on_value}">${cmd.on_label}</option><option value="${cmd.off_value}">${cmd.off_label}</option>`;

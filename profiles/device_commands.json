@@ -87,10 +87,10 @@
       "label": "Luminaria",
       "value_type": "on_off",
       "on_label": "Encender",
-      "on_value": 0,
+      "on_value": 1,
       "off_label": "Apagar",
-      "off_value": 1,
-      "note": "LED de estado del dispositivo, no las tiras RGB -- activo en bajo (OUT0 = encendido)"
+      "off_value": 0,
+      "note": "LED de estado del dispositivo, no las tiras RGB"
     }
   ]
 }
