@@ -112,13 +112,51 @@ def build_payload(command_id: str, value=None) -> str:
     return f"{command_id}{value_str}".upper()
 
 
-def publish_command(command_id: str, value=None) -> bool:
+def _try_publish(payload: str) -> bool:
+    try:
+        result = _client.publish(
+            MQTT_CFG["command_topic"], payload, qos=MQTT_CFG.get("qos", 1)
+        )
+    except OSError as e:
+        logger.error("Publish raised %s: %s", e, payload)
+        return False
+    if result.rc == mqtt.MQTT_ERR_SUCCESS:
+        logger.info("Published command: %s", payload)
+        return True
+    logger.error("Publish failed with rc=%s: %s", result.rc, payload)
+    return False
+
+
+def publish_command(command_id: str, value=None) -> tuple[bool, str]:
+    """
+    _connected can still read True right after the network path actually died
+    (WiFi/LTE handover) since paho only notices on the next keepalive or write
+    attempt -- often the write this function is about to make. So a failed
+    publish here is reconnected and retried once before giving up, instead of
+    trusting the stale flag and erroring out immediately.
+
+    Returns (ok, error_message); error_message is a user-facing string in
+    Spanish, empty on success.
+    """
+    global _connected
     if _client is None or not _connected:
         logger.error("Cannot publish, MQTT not connected")
-        return False
+        return False, "No hay conexión con el broker MQTT."
     payload = build_payload(command_id, value)
-    result = _client.publish(
-        MQTT_CFG["command_topic"], payload, qos=MQTT_CFG.get("qos", 1)
-    )
-    logger.info("Published command: %s", payload)
-    return result.rc == mqtt.MQTT_ERR_SUCCESS
+    if _try_publish(payload):
+        return True, ""
+
+    _connected = False
+    logger.warning("Publish failed, reconnecting and retrying: %s", payload)
+    try:
+        _client.reconnect()
+    except OSError as e:
+        logger.error("Reconnect failed: %s", e)
+        return False, "Se perdió la conexión con el broker MQTT y no se pudo reconectar."
+
+    if _try_publish(payload):
+        _connected = True
+        return True, ""
+
+    logger.error("Publish retry failed after reconnect: %s", payload)
+    return False, "El comando no pudo enviarse; la conexión MQTT sigue inestable."

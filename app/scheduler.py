@@ -54,7 +54,7 @@ def _run_job(schedule_id: int, commands: list[dict]):
     for i, cmd in enumerate(commands):
         if i > 0:
             time.sleep(INTER_COMMAND_DELAY_S)
-        ok = publish_command(cmd["command_id"], cmd.get("value"))
+        ok, _ = publish_command(cmd["command_id"], cmd.get("value"))
         all_ok = all_ok and ok
     db.mark_schedule(schedule_id, "sent" if all_ok else "failed")
     logger.info("Scheduled state %s (%d commands) -> %s", schedule_id, len(commands), "sent" if all_ok else "failed")

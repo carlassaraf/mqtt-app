@@ -335,6 +335,11 @@ function openCommandSheet(cmd) {
   const sendBtn = document.createElement("button");
   sendBtn.className = "primary";
   sendBtn.textContent = "Enviar comando";
+
+  const errorMsg = document.createElement("p");
+  errorMsg.className = "meta send-error";
+  errorMsg.style.display = "none";
+
   sendBtn.addEventListener("click", async () => {
     if (cmd.confirm && !confirm(cmd.confirm_text || "¿Estás seguro?")) return;
 
@@ -344,19 +349,29 @@ function openCommandSheet(cmd) {
 
     sendBtn.disabled = true;
     sendBtn.textContent = "Enviando…";
+    errorMsg.style.display = "none";
     try {
       const res = await fetch("/api/commands/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ command_id: cmd.id, value }),
       });
-      sendBtn.textContent = res.ok ? "Enviado" : "Error";
+      if (res.ok) {
+        sendBtn.textContent = "Enviado";
+        setTimeout(() => backdrop.classList.remove("open"), 600);
+        return;
+      }
+      const data = await res.json().catch(() => null);
+      errorMsg.textContent = data?.detail || "No se pudo enviar el comando.";
     } catch {
-      sendBtn.textContent = "Error";
+      errorMsg.textContent = "No se pudo conectar con el servidor.";
     }
-    setTimeout(() => backdrop.classList.remove("open"), 600);
+    errorMsg.style.display = "";
+    sendBtn.disabled = false;
+    sendBtn.textContent = "Enviar comando";
   });
   sheet.appendChild(sendBtn);
+  sheet.appendChild(errorMsg);
 
   backdrop.classList.add("open");
 }
