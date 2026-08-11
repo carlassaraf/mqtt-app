@@ -305,7 +305,74 @@ async function loadProfile() {
       (c) => SPECIAL_ONLY_COMMAND_IDS.includes(c.id) || SPECIAL_SHARED_COMMAND_IDS.includes(c.id)
     )
   );
+  renderPresetGrid();
   renderScheduleForm();
+}
+
+// ---------- quick color presets ----------
+// Shortcuts for the columns' 3 solid colors, each in "fijo" (steady) or
+// "intermitente" (1s blink) variants. These don't map to a single device
+// command, so they can't live in device_commands.json like the cards above --
+// each one fires the same short sequence SCHEDULE_STATES.frame uses (AUT
+// first, to clear whatever ping-pong/strip-color mode the device was left
+// in, since only AUT clears those -- see the comment above SCHEDULE_STATES),
+// just sent immediately instead of scheduled.
+const COLOR_PRESETS = [
+  { label: "Rojo Fijo", color: "rojo", frame: 4, blink: 0 },
+  { label: "Rojo Intermitente", color: "rojo", frame: 4, blink: 1000 },
+  { label: "Amarillo Fijo", color: "amarillo", frame: 22, blink: 0 },
+  { label: "Amarillo Intermitente", color: "amarillo", frame: 22, blink: 1000 },
+  { label: "Verde Fijo", color: "verde", frame: 5, blink: 0 },
+  { label: "Verde Intermitente", color: "verde", frame: 5, blink: 1000 },
+];
+
+async function sendCommandSequence(commands) {
+  for (const { command_id, value } of commands) {
+    const res = await fetch("/api/commands/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ command_id, value: value ?? null }),
+    });
+    if (!res.ok) return false;
+  }
+  return true;
+}
+
+function renderPresetGrid() {
+  const grid = document.getElementById("presetCommandGrid");
+  grid.innerHTML = "";
+  for (const preset of COLOR_PRESETS) {
+    const card = document.createElement("div");
+    card.className = "command-card";
+    const glyph = document.createElement("span");
+    glyph.className = `command-glyph preset-glyph preset-${preset.color}${preset.blink ? " blink" : ""}`;
+    const text = document.createElement("span");
+    text.textContent = preset.label;
+    card.appendChild(glyph);
+    card.appendChild(text);
+
+    card.addEventListener("click", async () => {
+      if (card.classList.contains("sending")) return;
+      card.classList.remove("sent", "error");
+      card.classList.add("sending");
+      let ok = false;
+      try {
+        ok = await sendCommandSequence([
+          { command_id: "AUT" },
+          { command_id: "FRM", value: preset.frame },
+          { command_id: "BLK", value: preset.blink },
+          { command_id: "ROT", value: 0 },
+        ]);
+      } catch {
+        ok = false;
+      }
+      card.classList.remove("sending");
+      card.classList.add(ok ? "sent" : "error");
+      setTimeout(() => card.classList.remove("sent", "error"), 800);
+    });
+
+    grid.appendChild(card);
+  }
 }
 
 function openCommandSheet(cmd) {
