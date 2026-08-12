@@ -37,6 +37,13 @@ body { display: flex; flex-direction: column; }
 
 .topbar-top { display: flex; align-items: center; justify-content: space-between; }
 .topbar-actions { display: flex; align-items: center; gap: 18px; }
+.device-select {
+  height: 60px; padding: 0 18px; border-radius: 30px;
+  background: var(--bg); color: var(--text); border: 1px solid var(--border);
+  font-size: 16px; font-weight: 600; font-family: var(--font);
+  cursor: pointer; appearance: none; -webkit-appearance: none;
+}
+.device-select:disabled { opacity: .5; cursor: default; }
 .topbar-info { display: flex; align-items: center; justify-content: flex-start; gap: 18px; }
 .meta { display: flex; align-items: center; gap: 10px; font-size: 28px; color: var(--text-dim); }
 .send-error { color: var(--danger); font-size: 24px; }

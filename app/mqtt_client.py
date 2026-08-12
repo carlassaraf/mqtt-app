@@ -14,7 +14,7 @@ import logging
 
 import paho.mqtt.client as mqtt
 
-from app.config import MQTT_CFG
+from app.config import DEVICES, MQTT_CFG
 from app.db import insert_log
 
 logger = logging.getLogger("mqtt")
@@ -23,6 +23,37 @@ _ws_subscribers: set[asyncio.Queue] = set()
 _loop: asyncio.AbstractEventLoop | None = None
 _client: mqtt.Client | None = None
 _connected = False
+
+# All devices share one broker connection and the same log_topic; only
+# their command_topic differs. _active_device_id picks which command_topic
+# publish_command() uses -- see set_active_device(). Not persisted across
+# restarts on purpose (this is a single kiosk, not a fleet), so it always
+# starts on the first configured device.
+_devices_by_id = {d["id"]: d for d in DEVICES}
+_active_device_id = DEVICES[0]["id"]
+
+
+def _active_device() -> dict:
+    return _devices_by_id[_active_device_id]
+
+
+def get_devices() -> list[dict]:
+    return [{"id": d["id"], "label": d["label"]} for d in DEVICES]
+
+
+def get_active_device_id() -> str:
+    return _active_device_id
+
+
+def set_active_device(device_id: str) -> bool:
+    """Switches which device's command_topic publish_command() uses from here
+    on -- the log subscription is shared across devices and untouched by this.
+    Returns False for an unknown device_id."""
+    global _active_device_id
+    if device_id not in _devices_by_id:
+        return False
+    _active_device_id = device_id
+    return True
 
 
 def register_ws_queue() -> asyncio.Queue:
@@ -115,7 +146,7 @@ def build_payload(command_id: str, value=None) -> str:
 def _try_publish(payload: str) -> bool:
     try:
         result = _client.publish(
-            MQTT_CFG["command_topic"], payload, qos=MQTT_CFG.get("qos", 1)
+            _active_device()["command_topic"], payload, qos=MQTT_CFG.get("qos", 1)
         )
     except OSError as e:
         logger.error("Publish raised %s: %s", e, payload)

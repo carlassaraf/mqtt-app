@@ -87,6 +87,48 @@ document.addEventListener("focusin", (e) => {
   keypadBackdrop.classList.add("open");
 });
 
+// ---------- device selector ----------
+// Two (or more) physical columns share one broker but each publishes/
+// subscribes on its own pair of topics (see config.json's mqtt.devices).
+// Switching here changes which topics the whole app talks to: commands sent
+// from any tab, and which device's traffic shows up in the Status log view.
+async function loadDevices() {
+  const select = document.getElementById("deviceSelect");
+  try {
+    const res = await fetch("/api/devices");
+    const data = await res.json();
+    select.innerHTML = "";
+    for (const device of data.devices) {
+      const opt = document.createElement("option");
+      opt.value = device.id;
+      opt.textContent = device.label;
+      select.appendChild(opt);
+    }
+    select.value = data.active_id;
+    select.dataset.current = data.active_id;
+  } catch {
+    // backend not reachable yet -- leave the select empty, nothing to pick
+  }
+}
+
+document.getElementById("deviceSelect").addEventListener("change", async (e) => {
+  const select = e.target;
+  const previous = select.dataset.current;
+  select.disabled = true;
+  try {
+    const res = await fetch("/api/devices/select", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ device_id: select.value }),
+    });
+    if (!res.ok) throw new Error();
+    select.dataset.current = select.value;
+  } catch {
+    select.value = previous; // switch failed -- stay on the previous device
+  }
+  select.disabled = false;
+});
+
 // ---------- minimize app ----------
 // Hides the Chromium window without killing it. Restoring happens outside
 // this page entirely (double-click the desktop launcher icon -- see
@@ -832,6 +874,7 @@ async function loadSchedules() {
 }
 
 // ---------- boot ----------
+loadDevices();
 loadProfile();
 connectLogSocket();
 loadSchedules();

@@ -5,9 +5,12 @@
     "client_id": "led-kiosk-controller",
     "username": null,
     "password": null,
+    "qos": 1,
     "log_topic": "columna/log",
-    "command_topic": "columna/led",
-    "qos": 1
+    "devices": [
+      { "id": "columna1", "label": "Columna 1 (NQN)", "command_topic": "columna/led" },
+      { "id": "columna2", "label": "Columna 2 (Demo)", "command_topic": "columna/demo" }
+    ]
   },
   "app": {
     "db_path": "data/app.db",

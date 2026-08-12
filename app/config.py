@@ -20,8 +20,30 @@ def load_config() -> dict:
         return json.load(f)
 
 
+def _load_devices(mqtt_cfg: dict) -> list[dict]:
+    """
+    Multiple physical columns share one broker and the same log_topic
+    (everyone's status messages land in one shared stream); only their
+    command_topic differs, so that's all "devices" in config.json lists.
+    Older config.json files (from before device switching existed) instead
+    have a single flat command_topic right on the mqtt block; that shape
+    still works, normalized here into a one-item devices list, so an
+    existing on-device config.json isn't broken by this update until
+    someone gets around to editing it.
+    """
+    devices = mqtt_cfg.get("devices")
+    if devices:
+        return devices
+    return [{
+        "id": "columna1",
+        "label": "Columna 1 (NQN)",
+        "command_topic": mqtt_cfg["command_topic"],
+    }]
+
+
 config = load_config()
 MQTT_CFG = config["mqtt"]
+DEVICES = _load_devices(MQTT_CFG)
 APP_CFG = config["app"]
 DB_PATH = ROOT / APP_CFG["db_path"]
 PROFILE_PATH = ROOT / APP_CFG["profile_path"]

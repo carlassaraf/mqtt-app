@@ -9,6 +9,10 @@ class SendCommandRequest(BaseModel):
     value: Optional[Union[int, str]] = None
 
 
+class SelectDeviceRequest(BaseModel):
+    device_id: str
+
+
 class ScheduleCommand(BaseModel):
     command_id: str
     value: Optional[Union[int, str]] = None
