@@ -33,15 +33,23 @@ body { display: flex; flex-direction: column; }
   padding: 20px 28px; border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-.topbar h1 { font-size: 20px; font-weight: 600; margin: 0; }
+.topbar h1 {
+  font-size: 20px; font-weight: 600; margin: 0;
+  flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
-.topbar-top { display: flex; align-items: center; justify-content: space-between; }
-.topbar-actions { display: flex; align-items: center; gap: 18px; }
+.topbar-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+/* flex-shrink: 0 on both children of topbar-actions -- without it, a long
+   device label leaves too little room and flexbox shrinks the icon-btn
+   circles themselves (they go oval/compressed) instead of the text. The
+   select truncates via its own width cap below; the icon buttons never do. */
+.topbar-actions { display: flex; align-items: center; gap: 18px; flex-shrink: 0; }
 .device-select {
   height: 60px; padding: 0 18px; border-radius: 30px;
   background: var(--bg); color: var(--text); border: 1px solid var(--border);
   font-size: 16px; font-weight: 600; font-family: var(--font);
   cursor: pointer; appearance: none; -webkit-appearance: none;
+  flex-shrink: 0; max-width: 45vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .device-select:disabled { opacity: .5; cursor: default; }
 .topbar-info { display: flex; align-items: center; justify-content: flex-start; gap: 18px; }
@@ -54,7 +62,7 @@ body { display: flex; flex-direction: column; }
 .status-dot.connected { background: var(--accent); }
 
 .icon-btn {
-  width: 60px; height: 60px; border-radius: 50%; border: 1px solid var(--border);
+  width: 60px; height: 60px; flex-shrink: 0; border-radius: 50%; border: 1px solid var(--border);
   background: var(--bg); color: var(--text); font-size: 28px; line-height: 1;
   cursor: pointer; display: flex; align-items: center; justify-content: center;
   appearance: none; -webkit-appearance: none;
