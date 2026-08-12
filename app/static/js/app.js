@@ -366,6 +366,25 @@ const COLOR_PRESETS = [
   { label: "Amarillo Intermitente", color: "amarillo", frame: 22, blink: 1000 },
   { label: "Verde Fijo", color: "verde", frame: 5, blink: 0 },
   { label: "Verde Intermitente", color: "verde", frame: 5, blink: 1000 },
+].map((p) => ({
+  label: p.label,
+  dotClass: `preset-${p.color}${p.blink ? " blink" : ""}`,
+  commands: [
+    { command_id: "AUT" },
+    { command_id: "FRM", value: p.frame },
+    { command_id: "BLK", value: p.blink },
+    { command_id: "ROT", value: 0 },
+  ],
+}));
+
+// CLR is a single raw command with no value and no bundled AUT/FRM/BLK/ROT
+// -- unlike the color presets above, so it doesn't fit COLOR_PRESETS's
+// frame/blink shape and is appended here as its own entry instead. It's not
+// in device_commands.json either, since (like the presets) it's only ever
+// fired from this quick list, never from a command sheet needing a value.
+const QUICK_PRESETS = [
+  ...COLOR_PRESETS,
+  { label: "Restaurar", glyphChar: "↺", commands: [{ command_id: "CLR" }] },
 ];
 
 async function sendCommandSequence(commands) {
@@ -383,11 +402,16 @@ async function sendCommandSequence(commands) {
 function renderPresetGrid() {
   const grid = document.getElementById("presetCommandGrid");
   grid.innerHTML = "";
-  for (const preset of COLOR_PRESETS) {
+  for (const preset of QUICK_PRESETS) {
     const card = document.createElement("div");
     card.className = "command-card";
     const glyph = document.createElement("span");
-    glyph.className = `command-glyph preset-glyph preset-${preset.color}${preset.blink ? " blink" : ""}`;
+    glyph.className = "command-glyph";
+    if (preset.dotClass) {
+      glyph.classList.add("preset-glyph", ...preset.dotClass.split(" "));
+    } else {
+      glyph.textContent = preset.glyphChar || preset.label[0];
+    }
     const text = document.createElement("span");
     text.textContent = preset.label;
     card.appendChild(glyph);
@@ -399,12 +423,7 @@ function renderPresetGrid() {
       card.classList.add("sending");
       let ok = false;
       try {
-        ok = await sendCommandSequence([
-          { command_id: "AUT" },
-          { command_id: "FRM", value: preset.frame },
-          { command_id: "BLK", value: preset.blink },
-          { command_id: "ROT", value: 0 },
-        ]);
+        ok = await sendCommandSequence(preset.commands);
       } catch {
         ok = false;
       }
