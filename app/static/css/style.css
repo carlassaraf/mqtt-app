@@ -106,13 +106,13 @@ main { padding: 24px 28px 100px; flex: 1 1 auto; min-height: 0; overflow-y: auto
 /* ---- Commands ---- */
 .command-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
 }
 .command-card {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 20px 16px; min-height: 130px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  padding: 18px 14px; min-height: 117px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 11px;
   cursor: pointer; text-align: center;
 }
 .command-card:active { background: var(--surface-2); border-color: var(--accent); }
@@ -120,11 +120,11 @@ main { padding: 24px 28px 100px; flex: 1 1 auto; min-height: 0; overflow-y: auto
 .command-card.sent { border-color: var(--accent); }
 .command-card.error { border-color: var(--danger); }
 .command-glyph {
-  width: 52px; height: 52px; border-radius: 50%; background: var(--accent-dim);
-  color: var(--accent); font-size: 22px; font-weight: 600;
+  width: 47px; height: 47px; border-radius: 50%; background: var(--accent-dim);
+  color: var(--accent); font-size: 20px; font-weight: 600;
   display: flex; align-items: center; justify-content: center;
 }
-.command-card span:not(.command-glyph) { font-size: 18px; font-weight: 500; }
+.command-card span:not(.command-glyph) { font-size: 16px; font-weight: 500; }
 
 /* ---- Color presets (traffic-light dots instead of a letter glyph) ---- */
 .preset-glyph.preset-rojo { background: var(--danger); }
