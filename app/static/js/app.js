@@ -387,8 +387,20 @@ const QUICK_PRESETS = [
   { label: "Restaurar", glyphChar: "↺", commands: [{ command_id: "CLR" }] },
 ];
 
+// Mirrors scheduler.py's INTER_COMMAND_DELAY_S: the device corrupts/misattributes
+// payloads when commands arrive faster than its ~100ms dispatch tick can drain
+// them, so successive commands in a sequence need a gap comfortably above that
+// tick instead of firing back-to-back. Scheduled states already pace themselves
+// server-side; this does the same for quick presets sent straight from the UI.
+const INTER_COMMAND_DELAY_MS = 300;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function sendCommandSequence(commands) {
-  for (const { command_id, value } of commands) {
+  for (const [i, { command_id, value }] of commands.entries()) {
+    if (i > 0) await sleep(INTER_COMMAND_DELAY_MS);
     const res = await fetch("/api/commands/send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
