@@ -16,6 +16,7 @@ import paho.mqtt.client as mqtt
 
 from app.config import DEVICES, MQTT_CFG
 from app.db import insert_log
+from app.message_log import log_message
 
 logger = logging.getLogger("mqtt")
 
@@ -96,6 +97,7 @@ def _on_disconnect(client, userdata, reason_code, properties=None):
 def _on_message(client, userdata, msg):
     payload_str = msg.payload.decode(errors="replace")
     insert_log(msg.topic, payload_str)
+    log_message(msg.topic, payload_str)
     _broadcast({"topic": msg.topic, "payload": payload_str})
 
 

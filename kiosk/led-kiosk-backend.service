@@ -20,6 +20,11 @@ WorkingDirectory=/home/pi4/led-kiosk
 ExecStart=/home/pi4/led-kiosk/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
 Restart=on-failure
 RestartSec=3
+# Pre-creates /var/log/led-kiosk owned by User= above before ExecStart runs --
+# app/message_log.py writes the MQTT message log there (see that file for why
+# plain app code can't just mkdir under /var/log itself). Falls back to a
+# repo-local logs/ dir if this unit isn't in play (e.g. local dev).
+LogsDirectory=led-kiosk
 
 [Install]
 WantedBy=multi-user.target
