@@ -52,9 +52,10 @@ Pick one path — they're alternatives, not both-at-once.
    should show a new gsm/wwan device.
 3. `sudo ./setup_lte_failover.sh` — installs ModemManager +
    NetworkManager's GSM support if missing, creates the `lte-backup`
-   connection (APN `datos.personal.com`, no auth by default — edit the
-   script if this SIM needs credentials), and sets route metrics so WiFi
-   (metric 100) is preferred over LTE (metric 700).
+   connection (APN `wap.gprs.unifon.com.ar`, auth `wap`/`wap` for the
+   current Movistar AR SIM — edit `APN`/`GSM_USER`/`GSM_PASS` in the script
+   if the SIM changes again), and sets route metrics so WiFi (metric 100)
+   is preferred over LTE (metric 700).
 
 ### Verifying (USB path)
 
@@ -84,10 +85,11 @@ config uses `local`/`nocrtscts`.
    static one with public resolvers (see "DNS" below), tells
    ModemManager to ignore the port (`ID_MM_DEVICE_IGNORE`, since it can't
    use it anyway and would otherwise contend with pppd for the port),
-   installs the chat script + pppd peer config (APN `datos.personal.com` —
-   edit `uart-ppp/peers-lte-backup`'s auth lines if this SIM needs
-   credentials) and an `lte-backup` systemd service that keeps pppd
-   running (`persist`, auto-restart).
+   installs the chat script + pppd peer config (APN `wap.gprs.unifon.com.ar`,
+   auth `wap`/`wap` already set in `uart-ppp/peers-lte-backup` for the
+   current Movistar AR SIM — edit those lines again if the SIM changes)
+   and an `lte-backup` systemd service that keeps pppd running (`persist`,
+   auto-restart).
 
 ### DNS
 

@@ -38,7 +38,7 @@
 # running, especially if this SIM needs PAP/CHAP auth.
 set -euo pipefail
 
-APN="datos.personal.com"
+APN="wap.gprs.unifon.com.ar"
 LTE_METRIC=700
 SERIAL_DEV="/dev/serial0"
 BAUD=115200

@@ -15,11 +15,12 @@
 # review before running, especially the route-metric values.
 set -euo pipefail
 
-APN="datos.personal.com"
+APN="wap.gprs.unifon.com.ar"
 # Uncomment and fill in only if the carrier requires auth on this SIM
-# (Personal AR typically doesn't):
-# GSM_USER="..."
-# GSM_PASS="..."
+# (Movistar AR does -- user/pass are both "wap"; Personal AR typically
+# doesn't need this):
+GSM_USER="wap"
+GSM_PASS="wap"
 
 WIFI_METRIC=100   # lower metric == preferred route
 LTE_METRIC=700

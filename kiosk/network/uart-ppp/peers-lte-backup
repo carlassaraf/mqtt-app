@@ -16,6 +16,7 @@ noipdefault
 novj
 novjccomp
 connect "/usr/sbin/chat -v -f /etc/chatscripts/lte-backup.chat"
-# Uncomment below if this SIM needs PAP/CHAP auth (Personal AR typically doesn't):
-# user "..."
-# password "..."
+# Uncomment below if this SIM needs PAP/CHAP auth (Movistar AR does -- both
+# "wap"; Personal AR typically doesn't need this):
+user "wap"
+password "wap"
