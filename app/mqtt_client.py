@@ -78,6 +78,15 @@ def _broadcast(payload: dict):
         _loop.call_soon_threadsafe(q.put_nowait, payload)
 
 
+def broadcast_event(payload: dict):
+    """Public entry point onto the same /ws/logs fan-out used for MQTT
+    messages, for other modules (e.g. scheduler.py firing from its own
+    thread) that have no MQTT message of their own to piggyback on. Callers
+    should include a "type" field so the frontend can tell it apart from a
+    plain {topic, payload} log line."""
+    _broadcast(payload)
+
+
 def _on_connect(client, userdata, flags, reason_code, properties=None):
     global _connected
     _connected = reason_code == 0

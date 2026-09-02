@@ -250,6 +250,34 @@ input[type="checkbox"] { width: 32px; height: 32px; accent-color: var(--accent);
   background: none; border: none; color: var(--text-dim); font-size: 33px; cursor: pointer;
 }
 
+/* ---- Toasts (scheduled program fired) ----
+   Non-blocking, top of screen, auto-dismiss -- unlike the sheet/keypad
+   backdrops this must never require a touch, since a schedule can fire with
+   nobody standing in front of the kiosk. */
+.toast-stack {
+  position: fixed; top: 24px; left: 50%; transform: translateX(-50%);
+  z-index: 30; display: flex; flex-direction: column; gap: 10px;
+  width: 100%; max-width: 520px; padding: 0 20px;
+  pointer-events: none; /* clicks pass through the gaps between toasts */
+}
+.toast {
+  pointer-events: auto;
+  display: flex; align-items: center; gap: 14px;
+  background: var(--surface); border: 1px solid var(--accent); border-left-width: 6px;
+  border-radius: var(--radius); padding: 16px 20px; box-shadow: 0 8px 24px rgba(0,0,0,.35);
+  font-size: 20px; cursor: pointer;
+  animation: toast-in .25s ease-out;
+}
+.toast.error { border-color: var(--danger); }
+.toast-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.toast.error .toast-dot { background: var(--danger); }
+.toast-text { flex: 1 1 auto; min-width: 0; }
+.toast-title { font-weight: 600; }
+.toast-label { color: var(--text-dim); font-size: 17px; margin-top: 2px; }
+.toast.leaving { animation: toast-out .2s ease-in forwards; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(-16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes toast-out { to { opacity: 0; transform: translateY(-16px); } }
+
 /* ---- Numeric keypad (replaces the OS on-screen keyboard for number fields) ---- */
 .keypad-backdrop {
   display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55);

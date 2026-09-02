@@ -16,7 +16,7 @@ from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from app import db
-from app.mqtt_client import is_connected, publish_command
+from app.mqtt_client import broadcast_event, is_connected, publish_command
 
 logger = logging.getLogger("scheduler")
 scheduler = BackgroundScheduler()
@@ -44,7 +44,7 @@ CATCHUP_CONNECT_TIMEOUT_S = 30
 CATCHUP_POLL_INTERVAL_S = 1
 
 
-def _run_job(schedule_id: int, commands: list[dict]):
+def _run_job(schedule_id: int, label: str, commands: list[dict]):
     """Fires every command in the state, in order, paced by INTER_COMMAND_DELAY_S.
     One failed publish doesn't stop the rest from going out -- but the row is
     marked 'failed' overall if any of them didn't make it, since the resulting
@@ -56,8 +56,13 @@ def _run_job(schedule_id: int, commands: list[dict]):
             time.sleep(INTER_COMMAND_DELAY_S)
         ok, _ = publish_command(cmd["command_id"], cmd.get("value"))
         all_ok = all_ok and ok
-    db.mark_schedule(schedule_id, "sent" if all_ok else "failed")
-    logger.info("Scheduled state %s (%d commands) -> %s", schedule_id, len(commands), "sent" if all_ok else "failed")
+    status = "sent" if all_ok else "failed"
+    db.mark_schedule(schedule_id, status)
+    logger.info("Scheduled state %s (%d commands) -> %s", schedule_id, len(commands), status)
+    # Lets the frontend (open on the kiosk screen or not) pop up a notice the
+    # instant a schedule actually fires, over the same /ws/logs socket the
+    # live MQTT log already uses -- see broadcast_event's docstring.
+    broadcast_event({"type": "schedule_fired", "schedule_id": schedule_id, "label": label, "status": status})
 
 
 def add_scheduled_command(label: str, commands: list[dict], run_at: datetime) -> int:
@@ -66,7 +71,7 @@ def add_scheduled_command(label: str, commands: list[dict], run_at: datetime) ->
         _run_job,
         "date",
         run_date=run_at,
-        args=[schedule_id, commands],
+        args=[schedule_id, label, commands],
         id=str(schedule_id),
         misfire_grace_time=3600,
     )
@@ -86,7 +91,7 @@ def start():
     _rearm_pending()
 
 
-def _wait_for_mqtt_then_catch_up(catchup: list[tuple[int, list[dict]]]):
+def _wait_for_mqtt_then_catch_up(catchup: list[tuple[int, str, list[dict]]]):
     """Runs on its own thread at startup. Waits (briefly, with a timeout) for
     MQTT to connect, then fires each missed-but-recent schedule in
     chronological order -- if several were missed, the last one firing last
@@ -97,10 +102,10 @@ def _wait_for_mqtt_then_catch_up(catchup: list[tuple[int, list[dict]]]):
     while not is_connected() and waited < CATCHUP_CONNECT_TIMEOUT_S:
         time.sleep(CATCHUP_POLL_INTERVAL_S)
         waited += CATCHUP_POLL_INTERVAL_S
-    for i, (schedule_id, commands) in enumerate(catchup):
+    for i, (schedule_id, label, commands) in enumerate(catchup):
         if i > 0:
             time.sleep(INTER_COMMAND_DELAY_S)
-        _run_job(schedule_id, commands)
+        _run_job(schedule_id, label, commands)
 
 
 def _rearm_pending():
@@ -110,7 +115,7 @@ def _rearm_pending():
         commands = json.loads(row["commands_json"])
         if row["run_at"] <= now:
             if now - row["run_at"] <= MISSED_SCHEDULE_CATCHUP_S:
-                catchup.append((row["id"], commands))
+                catchup.append((row["id"], row["label"], commands))
             else:
                 db.mark_schedule(row["id"], "missed")
             continue
@@ -118,7 +123,7 @@ def _rearm_pending():
             _run_job,
             "date",
             run_date=datetime.fromtimestamp(row["run_at"]),
-            args=[row["id"], commands],
+            args=[row["id"], row["label"], commands],
             id=str(row["id"]),
             misfire_grace_time=3600,
         )

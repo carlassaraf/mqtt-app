@@ -530,10 +530,54 @@ function appendLogLine(msg) {
   view.scrollTop = 0;
 }
 
+// ---------- toasts: pop up when a scheduled program fires ----------
+const TOAST_AUTO_DISMISS_MS = 6000;
+
+function showToast({ label, status }) {
+  const stack = document.getElementById("toastStack");
+  const toast = document.createElement("div");
+  const ok = status !== "failed";
+  toast.className = ok ? "toast" : "toast error";
+
+  const dot = document.createElement("span");
+  dot.className = "toast-dot";
+  toast.appendChild(dot);
+
+  const text = document.createElement("div");
+  text.className = "toast-text";
+  const title = document.createElement("div");
+  title.className = "toast-title";
+  title.textContent = ok ? "Programa activado" : "El programa no se pudo activar";
+  const sub = document.createElement("div");
+  sub.className = "toast-label";
+  sub.textContent = label;
+  text.appendChild(title);
+  text.appendChild(sub);
+  toast.appendChild(text);
+
+  function dismiss() {
+    if (!toast.isConnected) return;
+    toast.classList.add("leaving");
+    setTimeout(() => toast.remove(), 200);
+  }
+  toast.addEventListener("click", dismiss); // tap to dismiss early
+  setTimeout(dismiss, TOAST_AUTO_DISMISS_MS);
+
+  stack.appendChild(toast);
+}
+
 function connectLogSocket() {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   const ws = new WebSocket(`${proto}://${location.host}/ws/logs`);
-  ws.onmessage = (evt) => appendLogLine(JSON.parse(evt.data));
+  ws.onmessage = (evt) => {
+    const msg = JSON.parse(evt.data);
+    if (msg.type === "schedule_fired") {
+      showToast(msg);
+      loadSchedules(); // the fired row just left "pending" -- reflect that without waiting for the 15s poll
+      return;
+    }
+    appendLogLine(msg);
+  };
   ws.onclose = () => setTimeout(connectLogSocket, 2000); // simple reconnect
 }
 
