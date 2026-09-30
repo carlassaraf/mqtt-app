@@ -16,7 +16,7 @@ from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from app import db
-from app.mqtt_client import broadcast_event, is_connected, publish_command
+from app.mqtt_client import broadcast_event, is_connected, publish_command, request_status_all, request_status_automatic
 
 logger = logging.getLogger("scheduler")
 scheduler = BackgroundScheduler()
@@ -42,6 +42,17 @@ MISSED_SCHEDULE_CATCHUP_S = 16 * 3600
 # still False, and publish_command() would otherwise fail immediately.
 CATCHUP_CONNECT_TIMEOUT_S = 30
 CATCHUP_POLL_INTERVAL_S = 1
+
+# Safety net for the command cards' last-known values (app/device_state.py)
+# drifting from reality -- e.g. someone changing the device over SMS, or the
+# device rebooting into automatic mode -- without waiting for someone to
+# press STA by hand.
+STATUS_REFRESH_INTERVAL_S = 3600
+
+# In automatic mode the device moves to the next frame on its own every ~2
+# minutes, so devices in that mode are polled on the same period to keep the
+# frame card current.
+AUTOMATIC_STATUS_REFRESH_INTERVAL_S = 120
 
 
 def _run_job(schedule_id: int, label: str, commands: list[dict]):
@@ -89,6 +100,13 @@ def remove_scheduled_command(schedule_id: int):
 def start():
     scheduler.start()
     _rearm_pending()
+    scheduler.add_job(request_status_all, "interval", seconds=STATUS_REFRESH_INTERVAL_S, id="status_refresh")
+    scheduler.add_job(
+        request_status_automatic,
+        "interval",
+        seconds=AUTOMATIC_STATUS_REFRESH_INTERVAL_S,
+        id="automatic_status_refresh",
+    )
 
 
 def _wait_for_mqtt_then_catch_up(catchup: list[tuple[int, str, list[dict]]]):

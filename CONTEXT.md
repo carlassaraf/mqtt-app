@@ -102,6 +102,7 @@ app/
   config.py            loads config.json (copy from config.example.json)
   db.py                 sqlite: logs + scheduled_commands tables
   mqtt_client.py        paho-mqtt wrapper + build_payload() + websocket fan-out
+  device_state.py        last-known property values per device (from sent commands + parsed STA replies), shown on the command cards
   scheduler.py           APScheduler wrapper, sqlite-persisted, re-arms on restart
   network_status.py       reads active default-route interface (wifi/lte/ethernet) for /api/status
   models.py               SendCommandRequest / ScheduleRequest (label + ordered list of commands, i.e. a "state")

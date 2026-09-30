@@ -106,6 +106,8 @@ async function loadDevices() {
     }
     select.value = data.active_id;
     select.dataset.current = data.active_id;
+    activeDeviceId = data.active_id;
+    refreshCommandGlyphs();
   } catch {
     // backend not reachable yet -- leave the select empty, nothing to pick
   }
@@ -123,6 +125,8 @@ document.getElementById("deviceSelect").addEventListener("change", async (e) => 
     });
     if (!res.ok) throw new Error();
     select.dataset.current = select.value;
+    activeDeviceId = select.value;
+    refreshCommandGlyphs();
   } catch {
     select.value = previous; // switch failed -- stay on the previous device
   }
@@ -331,9 +335,67 @@ function renderCommandGrid(gridId, commands) {
   for (const cmd of commands) {
     const card = document.createElement("div");
     card.className = "command-card";
-    card.innerHTML = `<span class="command-glyph">${cmd.id[0]}</span><span>${cmd.label}</span>`;
+    card.innerHTML = `<span class="command-glyph" data-command-id="${cmd.id}"></span><span>${cmd.label}</span>`;
     card.addEventListener("click", () => openCommandSheet(cmd));
     grid.appendChild(card);
+  }
+  refreshCommandGlyphs();
+}
+
+// ---------- last-known device values on the command cards ----------
+// The backend tracks each device's property values (app/device_state.py):
+// assumed from every command sent, overwritten by every STA reply. Cards
+// show that value in place of the letter (AUT/INV show ON/OFF for automatic
+// mode / inverted rotation); the letter stays for STA and anything not known yet.
+let activeDeviceId = null;
+let deviceStates = {}; // device id -> { command id -> value }
+
+async function loadDeviceStates() {
+  try {
+    const res = await fetch("/api/devices/state");
+    deviceStates = await res.json();
+    refreshCommandGlyphs();
+  } catch {
+    // backend not reachable yet -- cards keep their letters
+  }
+}
+
+function renderGlyph(glyph, cmd, value) {
+  glyph.textContent = "";
+  glyph.style.background = "";
+  glyph.className = "command-glyph";
+  if (value === undefined || value === null) {
+    glyph.textContent = cmd.id[0];
+    return;
+  }
+  glyph.classList.add("has-value");
+  if (cmd.value_type === "hex_color") {
+    glyph.classList.add("color-value");
+    glyph.style.background = `#${value}`;
+  } else if (cmd.value_type === "hex_color_triple") {
+    // SCL: one pie slice per strip, in strip order
+    const [a, b, c] = String(value).match(/.{6}/g) || [];
+    glyph.classList.add("color-value");
+    glyph.style.background = `conic-gradient(#${a} 0 120deg, #${b} 120deg 240deg, #${c} 240deg)`;
+  } else if (cmd.value_type === "toggle" || cmd.value_type === "on_off" || cmd.value_type === "none") {
+    // "none" only ever has a value for AUT (automatic mode active) and INV
+    // (rotation inverted)
+    const on = Number(value) === (cmd.on_value ?? 1);
+    glyph.textContent = on ? "ON" : "OFF";
+    glyph.classList.add("small", on ? "on" : "off");
+  } else {
+    const text = `${value}${cmd.unit === "%" ? "%" : ""}`;
+    glyph.textContent = text;
+    if (text.length > 3) glyph.classList.add("small");
+  }
+}
+
+function refreshCommandGlyphs() {
+  if (!profile) return;
+  const state = deviceStates[activeDeviceId] || {};
+  for (const glyph of document.querySelectorAll(".command-glyph[data-command-id]")) {
+    const cmd = getCmd(glyph.dataset.commandId);
+    if (cmd) renderGlyph(glyph, cmd, state[cmd.id]);
   }
 }
 
@@ -569,8 +631,16 @@ function showToast({ label, status }) {
 function connectLogSocket() {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   const ws = new WebSocket(`${proto}://${location.host}/ws/logs`);
+  // (Re)fetch the full card values on every (re)connect -- any device_state
+  // pushes sent while the socket was down were missed.
+  ws.onopen = loadDeviceStates;
   ws.onmessage = (evt) => {
     const msg = JSON.parse(evt.data);
+    if (msg.type === "device_state") {
+      deviceStates[msg.device_id] = msg.state;
+      refreshCommandGlyphs();
+      return;
+    }
     if (msg.type === "schedule_fired") {
       showToast(msg);
       loadSchedules(); // the fired row just left "pending" -- reflect that without waiting for the 15s poll

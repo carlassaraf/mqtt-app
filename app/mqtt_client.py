@@ -11,9 +11,12 @@ push a message to websocket subscribers.
 """
 import asyncio
 import logging
+import threading
+import time
 
 import paho.mqtt.client as mqtt
 
+from app import device_state
 from app.config import DEVICES, MQTT_CFG
 from app.db import insert_log
 from app.message_log import log_message
@@ -33,9 +36,16 @@ _connected = False
 _devices_by_id = {d["id"]: d for d in DEVICES}
 _active_device_id = DEVICES[0]["id"]
 
+# STA replies only show in the Status tab's live log when someone asked for
+# one by hand; the app's own automatic STAs (connect, device switch, hourly,
+# 2-minute in automatic mode, after CLR) would otherwise flood it. Maps
+# device id -> monotonic deadline for its manually requested reply to arrive.
+_manual_status_until: dict[str, float] = {}
+MANUAL_STATUS_REPLY_WINDOW_S = 30
 
-def _active_device() -> dict:
-    return _devices_by_id[_active_device_id]
+# Gap before the automatic STA that follows CLR, mirroring scheduler.py's
+# INTER_COMMAND_DELAY_S (the firmware misbehaves on back-to-back commands).
+POST_CLR_STATUS_DELAY_S = 0.3
 
 
 def get_devices() -> list[dict]:
@@ -93,6 +103,12 @@ def _on_connect(client, userdata, flags, reason_code, properties=None):
     if _connected:
         logger.info("MQTT connected, subscribing to %s", MQTT_CFG["log_topic"])
         client.subscribe(MQTT_CFG["log_topic"], qos=MQTT_CFG.get("qos", 1))
+        # Covers both app boot and resyncing after any dropped connection:
+        # ask every device for a fresh status so the command cards show real
+        # values instead of whatever (if anything) was assumed before. On its
+        # own thread: publish_command()'s failure path reconnects, which
+        # mustn't happen from inside paho's own callback.
+        threading.Thread(target=request_status_all, daemon=True).start()
     else:
         logger.error("MQTT connect failed: %s", reason_code)
 
@@ -107,7 +123,16 @@ def _on_message(client, userdata, msg):
     payload_str = msg.payload.decode(errors="replace")
     insert_log(msg.topic, payload_str)
     log_message(msg.topic, payload_str)
+    report = device_state.apply_status_report(payload_str)
+    if report:
+        _broadcast_device_state(*report)
+        if time.monotonic() > _manual_status_until.pop(report[0], 0):
+            return  # automatic STA reply: stored and logged to file, kept out of the live view
     _broadcast({"topic": msg.topic, "payload": payload_str})
+
+
+def _broadcast_device_state(device_id: str, state: dict):
+    _broadcast({"type": "device_state", "device_id": device_id, "state": state})
 
 
 def start(loop: asyncio.AbstractEventLoop):
@@ -154,10 +179,10 @@ def build_payload(command_id: str, value=None) -> str:
     return f"{command_id}{value_str}".upper()
 
 
-def _try_publish(payload: str) -> bool:
+def _try_publish(payload: str, device_id: str) -> bool:
     try:
         result = _client.publish(
-            _active_device()["command_topic"], payload, qos=MQTT_CFG.get("qos", 1)
+            _devices_by_id[device_id]["command_topic"], payload, qos=MQTT_CFG.get("qos", 1)
         )
     except OSError as e:
         logger.error("Publish raised %s: %s", e, payload)
@@ -169,8 +194,10 @@ def _try_publish(payload: str) -> bool:
     return False
 
 
-def publish_command(command_id: str, value=None) -> tuple[bool, str]:
+def publish_command(command_id: str, value=None, device_id: str | None = None) -> tuple[bool, str]:
     """
+    Sends to the active device unless device_id names another one.
+
     _connected can still read True right after the network path actually died
     (WiFi/LTE handover) since paho only notices on the next keepalive or write
     attempt -- often the write this function is about to make. So a failed
@@ -184,8 +211,10 @@ def publish_command(command_id: str, value=None) -> tuple[bool, str]:
     if _client is None or not _connected:
         logger.error("Cannot publish, MQTT not connected")
         return False, "No hay conexión con el broker MQTT."
+    device_id = device_id or _active_device_id
     payload = build_payload(command_id, value)
-    if _try_publish(payload):
+    if _try_publish(payload, device_id):
+        _after_sent(device_id, command_id, value)
         return True, ""
 
     _connected = False
@@ -196,9 +225,45 @@ def publish_command(command_id: str, value=None) -> tuple[bool, str]:
         logger.error("Reconnect failed: %s", e)
         return False, "Se perdió la conexión con el broker MQTT y no se pudo reconectar."
 
-    if _try_publish(payload):
+    if _try_publish(payload, device_id):
         _connected = True
+        _after_sent(device_id, command_id, value)
         return True, ""
 
     logger.error("Publish retry failed after reconnect: %s", payload)
     return False, "El comando no pudo enviarse; la conexión MQTT sigue inestable."
+
+
+def _after_sent(device_id: str, command_id: str, value):
+    state = device_state.record_sent(device_id, command_id, value)
+    if state is not None:
+        _broadcast_device_state(device_id, state)
+    # CLR undoes the quick color presets, leaving the device in a state this
+    # app can't predict -- ask for it instead of guessing.
+    if command_id.strip().upper() == "CLR":
+        threading.Timer(
+            POST_CLR_STATUS_DELAY_S, publish_command, args=("STA",), kwargs={"device_id": device_id}
+        ).start()
+
+
+def expect_manual_status_reply(device_id: str):
+    """Call right before publishing a STA someone asked for by hand, so its
+    reply shows in the live log like any other message."""
+    _manual_status_until[device_id] = time.monotonic() + MANUAL_STATUS_REPLY_WINDOW_S
+
+
+def request_status_all():
+    """Sends STA to every configured device. Each has its own command topic,
+    so no pacing is needed between them (the firmware-queue burst problem is
+    per device). Fire-and-forget: the replies update device_state whenever --
+    if ever -- they arrive."""
+    for device_id in _devices_by_id:
+        publish_command("STA", device_id=device_id)
+
+
+def request_status_automatic():
+    """STA to every device currently known to be in automatic mode, whose
+    frame changes on its own -- keeps the frame card roughly in step."""
+    for device_id in _devices_by_id:
+        if device_state.is_automatic(device_id):
+            publish_command("STA", device_id=device_id)

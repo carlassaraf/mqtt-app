@@ -126,6 +126,12 @@ main { padding: 24px 28px 100px; flex: 1 1 auto; min-height: 0; overflow-y: auto
 }
 .command-card span:not(.command-glyph) { font-size: 16px; font-weight: 500; }
 
+/* Last-known device value shown in place of the letter (see refreshCommandGlyphs) */
+.command-glyph.has-value { font-variant-numeric: tabular-nums; }
+.command-glyph.small { font-size: 13px; }
+.command-glyph.off { color: var(--text-dim); background: var(--surface-2); }
+.command-glyph.color-value { border: 2px solid var(--border); }
+
 /* Quick color presets: narrower cards (80%), smaller circles -- labels may wrap */
 #presetCommandGrid { grid-template-columns: repeat(auto-fill, minmax(144px, 1fr)); }
 #presetCommandGrid .command-glyph { width: 38px; height: 38px; font-size: 16px; }
