@@ -107,6 +107,10 @@ _STATUS_FIELDS = [
     ("ROT", re.compile(r"Rotacion\s*(?:invertida)?\s*(\d+)ms"), int),
     ("INV", re.compile(r"Rotacion\s*(invertida)?\s*\d+ms"), lambda s: 1 if s else 0),
     ("OUT", re.compile(r"^Luminaria: (on|off)\s*$", re.MULTILINE), lambda s: 1 if s == "on" else 0),
+    # Sensor readings, not commands: shown on read-only indicator cards.
+    ("CUR", re.compile(r"Corriente: (-?\d+(?:\.\d+)?)A"), float),
+    ("TMP", re.compile(r"Temperatura: (-?\d+(?:\.\d+)?)C"), float),
+    ("HUM", re.compile(r"Humedad: (-?\d+(?:\.\d+)?)%"), float),
 ]
 _STATUS_MARKER = re.compile(r"Escena \d+ cargada")
 _STATUS_MODE = re.compile(r"^Modo: (.+?)\s*$", re.MULTILINE)

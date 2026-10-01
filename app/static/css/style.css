@@ -117,6 +117,9 @@ main { padding: 24px 28px 100px; flex: 1 1 auto; min-height: 0; overflow-y: auto
 }
 .command-card:active { background: var(--surface-2); border-color: var(--accent); }
 .command-card.sending { opacity: .6; }
+/* Sensor readings (see SENSOR_INDICATORS): look like a command, don't react to taps */
+.command-card.indicator-card { cursor: default; }
+.command-card.indicator-card:active { background: var(--surface); border-color: var(--border); }
 .command-card.sent { border-color: var(--accent); }
 .command-card.error { border-color: var(--danger); }
 .command-glyph {

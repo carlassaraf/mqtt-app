@@ -342,6 +342,26 @@ function renderCommandGrid(gridId, commands) {
   refreshCommandGlyphs();
 }
 
+// Read-only sensor readings from the STA reply, shown as cards at the end of
+// the "Comandos" grid. Same look as a command card, but not tappable -- there's
+// no command behind them. Their ids are device_state.py's keys for each reading.
+const SENSOR_INDICATORS = [
+  { id: "TMP", label: "Temperatura", value_type: "reading", unit: "°C", decimals: 1 },
+  { id: "CUR", label: "Corriente", value_type: "reading", unit: "A", decimals: 2 },
+  { id: "HUM", label: "Humedad", value_type: "reading", unit: "%", decimals: 0 },
+];
+
+function renderIndicatorCards(gridId) {
+  const grid = document.getElementById(gridId);
+  for (const indicator of SENSOR_INDICATORS) {
+    const card = document.createElement("div");
+    card.className = "command-card indicator-card";
+    card.innerHTML = `<span class="command-glyph" data-command-id="${indicator.id}"></span><span>${indicator.label}</span>`;
+    grid.appendChild(card);
+  }
+  refreshCommandGlyphs();
+}
+
 // ---------- last-known device values on the command cards ----------
 // The backend tracks each device's property values (app/device_state.py):
 // assumed from every command sent, overwritten by every STA reply. Cards
@@ -377,6 +397,9 @@ function renderGlyph(glyph, cmd, value) {
     const [a, b, c] = String(value).match(/.{6}/g) || [];
     glyph.classList.add("color-value");
     glyph.style.background = `conic-gradient(#${a} 0 120deg, #${b} 120deg 240deg, #${c} 240deg)`;
+  } else if (cmd.value_type === "reading") {
+    glyph.textContent = `${Number(value).toFixed(cmd.decimals)}${cmd.unit}`;
+    glyph.classList.add("small");
   } else if (cmd.value_type === "toggle" || cmd.value_type === "on_off" || cmd.value_type === "none") {
     // "none" only ever has a value for AUT (automatic mode active) and INV
     // (rotation inverted)
@@ -394,7 +417,8 @@ function refreshCommandGlyphs() {
   if (!profile) return;
   const state = deviceStates[activeDeviceId] || {};
   for (const glyph of document.querySelectorAll(".command-glyph[data-command-id]")) {
-    const cmd = getCmd(glyph.dataset.commandId);
+    const id = glyph.dataset.commandId;
+    const cmd = getCmd(id) || SENSOR_INDICATORS.find((i) => i.id === id);
     if (cmd) renderGlyph(glyph, cmd, state[cmd.id]);
   }
 }
@@ -403,6 +427,7 @@ async function loadProfile() {
   const res = await fetch("/api/commands");
   profile = await res.json();
   renderCommandGrid("commandGrid", profile.commands.filter((c) => !SPECIAL_ONLY_COMMAND_IDS.includes(c.id)));
+  renderIndicatorCards("commandGrid");
   renderCommandGrid(
     "specialCommandGrid",
     profile.commands.filter(
