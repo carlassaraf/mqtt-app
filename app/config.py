@@ -38,6 +38,7 @@ def _load_devices(mqtt_cfg: dict) -> list[dict]:
         "id": "columna1",
         "label": "Columna 1 (NQN)",
         "command_topic": mqtt_cfg["command_topic"],
+        "status_tag": "COL-02",
     }]
 
 

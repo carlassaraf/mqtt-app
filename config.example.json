@@ -8,7 +8,7 @@
     "qos": 1,
     "log_topic": "columna/log",
     "devices": [
-      { "id": "columna1", "label": "Columna 1 (NQN)", "command_topic": "columna/led" },
+      { "id": "columna1", "label": "Columna 1 (NQN)", "command_topic": "columna/led", "status_tag": "COL-02" },
       { "id": "columna2", "label": "Columna 2 (Demo)", "command_topic": "columna/demo" }
     ]
   },
