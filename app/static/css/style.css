@@ -132,6 +132,16 @@ main { padding: 24px 28px 100px; flex: 1 1 auto; min-height: 0; overflow-y: auto
 /* Last-known device value shown in place of the letter (see refreshCommandGlyphs) */
 .command-glyph.has-value { font-variant-numeric: tabular-nums; }
 .command-glyph.small { font-size: 13px; }
+
+/* Main "Comandos" tab: people read values off it from a distance, so bigger
+   glyphs and text, and a fixed 6-column grid so all its cards (commands +
+   sensor indicators) fit on the 7" screen without scrolling. */
+#commandGrid { grid-template-columns: repeat(6, 1fr); gap: 12px; }
+#commandGrid .command-card { padding: 14px 8px; min-height: 170px; gap: 10px; }
+#commandGrid .command-glyph { width: 72px; height: 72px; font-size: 30px; }
+#commandGrid .command-glyph.has-value { font-size: 26px; }
+#commandGrid .command-glyph.small { font-size: 19px; }
+#commandGrid .command-card span:not(.command-glyph) { font-size: 19px; line-height: 1.2; }
 .command-glyph.off { color: var(--text-dim); background: var(--surface-2); }
 .command-glyph.color-value { border: 2px solid var(--border); }
 

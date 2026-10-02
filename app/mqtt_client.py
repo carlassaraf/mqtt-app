@@ -126,8 +126,14 @@ def _on_message(client, userdata, msg):
     report = device_state.apply_status_report(payload_str)
     if report:
         _broadcast_device_state(*report)
-        if time.monotonic() > _manual_status_until.pop(report[0], 0):
+        if device_state.is_full_status_report(payload_str) and time.monotonic() > _manual_status_until.pop(report[0], 0):
             return  # automatic STA reply: stored and logged to file, kept out of the live view
+    # The device's "Received command: status request ('STA')" echo, sent just
+    # before the report: hidden along with it unless the STA was manual (the
+    # window stays open here -- it's closed by the report itself).
+    echo_device = device_state.status_request_echo_device(payload_str)
+    if echo_device and time.monotonic() > _manual_status_until.get(echo_device, 0):
+        return
     _broadcast({"topic": msg.topic, "payload": payload_str})
 
 

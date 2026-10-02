@@ -347,8 +347,8 @@ function renderCommandGrid(gridId, commands) {
 // no command behind them. Their ids are device_state.py's keys for each reading.
 const SENSOR_INDICATORS = [
   { id: "TMP", label: "Temperatura", value_type: "reading", unit: "°C", decimals: 1 },
-  { id: "CUR", label: "Corriente", value_type: "reading", unit: "A", decimals: 2 },
   { id: "HUM", label: "Humedad", value_type: "reading", unit: "%", decimals: 0 },
+  { id: "CUR", label: "Corriente", value_type: "reading", unit: "A", decimals: 2 },
 ];
 
 function renderIndicatorCards(gridId) {
