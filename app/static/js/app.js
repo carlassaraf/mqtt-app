@@ -1041,6 +1041,48 @@ async function loadSchedules() {
     });
     list.appendChild(item);
   }
+  renderUpcoming(rows);
+}
+
+// Glance at the next pending events on the main tab -- only room for a couple
+// below the command grid; tapping one opens the full Eventos Pendientes tab.
+const UPCOMING_MAX = 2;
+
+function formatUpcomingWhen(date) {
+  const time = date.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+  const today = new Date();
+  const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+  if (date.toDateString() === today.toDateString()) return `hoy ${time}`;
+  if (date.toDateString() === tomorrow.toDateString()) return `mañana ${time}`;
+  return `${date.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit" })} ${time}`;
+}
+
+function renderUpcoming(rows) {
+  const list = document.getElementById("upcomingList");
+  list.innerHTML = "";
+  const extra = rows.length - UPCOMING_MAX;
+  document.getElementById("upcomingHeading").textContent =
+    extra > 0 ? `Próximos eventos (+${extra} más)` : "Próximos eventos";
+  if (rows.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "upcoming-empty";
+    empty.textContent = "Sin eventos programados";
+    list.appendChild(empty);
+    return;
+  }
+  for (const row of rows.slice(0, UPCOMING_MAX)) {
+    const item = document.createElement("div");
+    item.className = "upcoming-item";
+    const label = document.createElement("span");
+    label.className = "upcoming-label";
+    label.textContent = row.label;
+    const when = document.createElement("span");
+    when.className = "upcoming-when";
+    when.textContent = formatUpcomingWhen(new Date(row.run_at * 1000));
+    item.append(label, when);
+    item.addEventListener("click", () => document.querySelector('.tab[data-tab="pending"]').click());
+    list.appendChild(item);
+  }
 }
 
 // ---------- boot ----------
