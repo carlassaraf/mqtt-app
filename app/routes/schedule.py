@@ -3,6 +3,7 @@ import time
 from fastapi import APIRouter, HTTPException
 
 from app.db import list_schedules
+from app.mqtt_client import target_label
 from app.models import ScheduleRequest
 from app.scheduler import add_scheduled_command, remove_scheduled_command
 
@@ -11,7 +12,10 @@ router = APIRouter(prefix="/api/schedule", tags=["schedule"])
 
 @router.get("")
 def get_schedules():
-    return list_schedules()
+    rows = list_schedules()
+    for row in rows:
+        row["target_label"] = target_label(row["target"])
+    return rows
 
 
 @router.post("")

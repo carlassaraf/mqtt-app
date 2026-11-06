@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS scheduled_commands (
     commands_json TEXT NOT NULL,
     run_at REAL NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
-    created_at REAL NOT NULL
+    created_at REAL NOT NULL,
+    target TEXT  -- "inst:1" / "legacy:nqn"; NULL (older rows): whatever is active when it fires
 );
 
 -- Numbered orders sent to an installation (app/manager.py). v runs 1, 2, 3...
@@ -69,10 +70,19 @@ def _migrate_legacy_schedule_table(conn):
         conn.execute("DROP TABLE scheduled_commands")
 
 
+def _add_schedule_target_column(conn):
+    """Schedules remember what they were created for since there's more than
+    one kind of target. Rows from before that keep target NULL."""
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(scheduled_commands)")}
+    if "target" not in cols:
+        conn.execute("ALTER TABLE scheduled_commands ADD COLUMN target TEXT")
+
+
 def init_db():
     with get_conn() as conn:
         _migrate_legacy_schedule_table(conn)
         conn.executescript(SCHEMA)
+        _add_schedule_target_column(conn)
 
 
 def insert_log(topic: str, payload: str):
@@ -91,12 +101,12 @@ def get_recent_logs(limit: int = 200):
     return [dict(r) for r in reversed(rows)]
 
 
-def insert_schedule(label: str, commands_json: str, run_at: float) -> int:
+def insert_schedule(label: str, commands_json: str, run_at: float, target: str | None) -> int:
     with get_conn() as conn:
         cur = conn.execute(
-            "INSERT INTO scheduled_commands (label, commands_json, run_at, created_at) "
-            "VALUES (?, ?, ?, ?)",
-            (label, commands_json, run_at, time.time()),
+            "INSERT INTO scheduled_commands (label, commands_json, run_at, created_at, target) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (label, commands_json, run_at, time.time(), target),
         )
         return cur.lastrowid
 

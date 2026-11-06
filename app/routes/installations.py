@@ -1,13 +1,15 @@
 from fastapi import APIRouter, HTTPException
 
-from app import device_state
-from app.models import SelectInstallationRequest, UnitCommandRequest
+from app import device_state, legacy
+from app.models import SelectTargetRequest, UnitCommandRequest
 from app.mqtt_client import (
-    get_active_inst,
+    get_active_target,
     get_installations,
+    get_targets,
+    parse_target,
     request_units_refresh,
     send_unit_command,
-    set_active_installation,
+    set_active_target,
     units_snapshot,
     validate_unit_command,
 )
@@ -22,15 +24,21 @@ def _check_inst(inst: int):
 
 @router.get("")
 def list_installations():
-    """Installations the topbar dropdown can target, plus which one is active."""
-    return {"installations": get_installations(), "active_inst": get_active_inst()}
+    """What the topbar dropdown can target (installations, then firmware 1.x
+    devices), plus which one is active."""
+    return {"installations": get_installations(), "targets": get_targets(), "active": get_active_target()}
 
 
 @router.post("/select")
-def select_installation(req: SelectInstallationRequest):
-    if not set_active_installation(req.inst):
-        raise HTTPException(404, "Instalación desconocida.")
-    return {"status": "ok", "active_inst": req.inst}
+def select_target(req: SelectTargetRequest):
+    if not set_active_target(req.target):
+        raise HTTPException(404, "Destino desconocido.")
+    kind, key = parse_target(req.target)
+    if kind == "legacy":
+        # Refresh its card values. A failed publish (MQTT down) shouldn't
+        # fail the switch itself.
+        legacy.request_status(key)
+    return {"status": "ok", "active": req.target}
 
 
 @router.get("/state")

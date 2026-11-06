@@ -87,31 +87,46 @@ document.addEventListener("focusin", (e) => {
   keypadBackdrop.classList.add("open");
 });
 
-// ---------- installation selector ----------
+// ---------- target selector ----------
 // Firmware 2.0 is addressed per installation: every order goes to all of its
-// units at once (see config.json's installations). Switching here changes
-// which installation the whole app talks to: orders sent from any tab, the
-// values on the command cards and the Unidades tab.
-let installations = [];
+// units at once (see config.json's installations). Devices still on firmware
+// 1.x (config.json's legacy_devices, e.g. the NQN column) are listed too and
+// take plain commands, one by one. Switching here changes what the whole app
+// talks to: commands sent from any tab, new schedules, the values on the
+// command cards and the Unidades tab.
+let targets = []; // [{ target: "inst:1" | "legacy:nqn", kind, label, inst | id }]
+let activeTarget = null;
+let activeInst = null; // set while an installation is active
+let activeLegacy = null; // set while a firmware 1.x device is active
+
+function setActiveTarget(target) {
+  activeTarget = target;
+  const t = targets.find((x) => x.target === target);
+  activeInst = t?.kind === "installation" ? t.inst : null;
+  activeLegacy = t?.kind === "legacy" ? t.id : null;
+  refreshCommandGlyphs();
+  renderUnits();
+  loadUnits();
+  updateScheduleTarget();
+}
 
 async function loadInstallations() {
   const select = document.getElementById("installationSelect");
   try {
     const res = await fetch("/api/installations");
     const data = await res.json();
-    installations = data.installations;
+    targets = data.targets;
     select.innerHTML = "";
-    for (const inst of installations) {
+    for (const t of targets) {
       const opt = document.createElement("option");
-      opt.value = inst.inst;
-      opt.textContent = inst.label;
+      opt.value = t.target;
+      opt.textContent = t.label;
       select.appendChild(opt);
     }
-    select.value = data.active_inst;
-    select.dataset.current = data.active_inst;
-    activeInst = data.active_inst;
-    refreshCommandGlyphs();
-    loadUnits();
+    select.value = data.active;
+    select.dataset.current = data.active;
+    setActiveTarget(data.active);
+    loadSchedules(); // target names show on the schedules once there's more than one
   } catch {
     // backend not reachable yet -- leave the select empty, nothing to pick
   }
@@ -125,15 +140,13 @@ document.getElementById("installationSelect").addEventListener("change", async (
     const res = await fetch("/api/installations/select", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ inst: Number(select.value) }),
+      body: JSON.stringify({ target: select.value }),
     });
     if (!res.ok) throw new Error();
     select.dataset.current = select.value;
-    activeInst = Number(select.value);
-    refreshCommandGlyphs();
-    loadUnits();
+    setActiveTarget(select.value);
   } catch {
-    select.value = previous; // switch failed -- stay on the previous installation
+    select.value = previous; // switch failed -- stay on the previous target
   }
   select.disabled = false;
 });
@@ -349,8 +362,10 @@ function renderCommandGrid(gridId, commands) {
 
 // Read-only sensor readings, shown as cards at the end of the "Comandos" grid.
 // Same look as a command card, but not tappable -- there's no command behind
-// them. Taken from the first group master's status (see sensorReadings());
-// every unit's own readings are in the Unidades tab.
+// them. For an installation they're taken from the first group master's
+// status (see sensorReadings()), every unit's own readings being in the
+// Unidades tab; a firmware 1.x device reports them in its STA reply, under
+// these same ids.
 const SENSOR_INDICATORS = [
   { id: "TMP", label: "Temperatura", value_type: "reading", unit: "°C", decimals: 1, read: (u) => u.aht_temp_c },
   { id: "HUM", label: "Humedad", value_type: "reading", unit: "%", decimals: 0, read: (u) => u.aht_hum },
@@ -369,20 +384,26 @@ function renderIndicatorCards(gridId) {
   refreshCommandGlyphs();
 }
 
-// ---------- last-known installation values on the command cards ----------
+// ---------- last-known values on the command cards ----------
 // The backend tracks what each installation shows (app/device_state.py),
 // following from the orders sent: every unit applies the same orders, so
-// they all show the same thing. Cards show that value in place of the letter
-// (AUT/INV show ON/OFF for automatic mode / inverted rotation); the letter
-// stays for anything not known yet.
-let activeInst = null;
+// they all show the same thing. For a firmware 1.x device (app/legacy.py)
+// it's assumed from the commands sent and overwritten by its STA replies.
+// Cards show that value in place of the letter (AUT/INV show ON/OFF for
+// automatic mode / inverted rotation); the letter stays for anything not
+// known yet.
 let installationStates = {}; // inst -> { command id -> value }
+let legacyStates = {}; // legacy device id -> { command id -> value }
 let unitsByInst = {}; // inst -> units snapshot from /api/installations/{inst}/units
 
 async function loadInstallationStates() {
   try {
-    const res = await fetch("/api/installations/state");
-    installationStates = await res.json();
+    const [inst, legacy] = await Promise.all([
+      fetch("/api/installations/state").then((r) => r.json()),
+      fetch("/api/legacy/state").then((r) => r.json()),
+    ]);
+    installationStates = inst;
+    legacyStates = legacy;
     refreshCommandGlyphs();
   } catch {
     // backend not reachable yet -- cards keep their letters
@@ -441,7 +462,9 @@ function renderGlyph(glyph, cmd, value) {
 
 function refreshCommandGlyphs() {
   if (!profile) return;
-  const state = { ...(installationStates[activeInst] || {}), ...sensorReadings(activeInst) };
+  const state = activeLegacy !== null
+    ? legacyStates[activeLegacy] || {}
+    : { ...(installationStates[activeInst] || {}), ...sensorReadings(activeInst) };
   for (const glyph of document.querySelectorAll(".command-glyph[data-command-id]")) {
     const id = glyph.dataset.commandId;
     const cmd = getCmd(id) || SENSOR_INDICATORS.find((i) => i.id === id);
@@ -681,6 +704,11 @@ function connectLogSocket() {
     const msg = JSON.parse(evt.data);
     if (msg.type === "installation_state") {
       installationStates[msg.inst] = msg.state;
+      refreshCommandGlyphs();
+      return;
+    }
+    if (msg.type === "legacy_state") {
+      legacyStates[msg.id] = msg.state;
       refreshCommandGlyphs();
       return;
     }
@@ -1018,6 +1046,12 @@ function renderScheduleForm() {
   const picker = createDateTimePicker();
   form.appendChild(picker.el);
 
+  const targetNote = document.createElement("p");
+  targetNote.className = "schedule-target";
+  targetNote.id = "scheduleTarget";
+  form.appendChild(targetNote);
+  updateScheduleTarget();
+
   const addBtn = document.createElement("button");
   addBtn.className = "primary";
   addBtn.textContent = "Programar estado";
@@ -1045,6 +1079,20 @@ function renderScheduleForm() {
   form.appendChild(addBtn);
 }
 
+// A schedule fires on the target that was active when it was created.
+function updateScheduleTarget() {
+  const note = document.getElementById("scheduleTarget");
+  if (!note) return;
+  const t = targets.find((x) => x.target === activeTarget);
+  note.textContent = t && targets.length > 1 ? `Se programa para: ${t.label}` : "";
+}
+
+// Which target a schedule is for -- only worth saying when there's a choice.
+function scheduleTargetLabel(row) {
+  if (targets.length <= 1) return "";
+  return row.target_label || (row.target ? "destino ya no configurado" : "destino activo al ejecutarse");
+}
+
 async function loadSchedules() {
   const res = await fetch("/api/schedule");
   const rows = await res.json();
@@ -1054,12 +1102,14 @@ async function loadSchedules() {
     const item = document.createElement("div");
     item.className = "schedule-item";
     const when = new Date(row.run_at * 1000).toLocaleString();
+    const target = scheduleTargetLabel(row);
     item.innerHTML = `
       <div>
         <div>${row.label}</div>
-        <div class="meta">${when} · ${row.status}</div>
+        <div class="meta"></div>
       </div>
       <button class="btn-cancel">Cancelar</button>`;
+    item.querySelector(".meta").textContent = [when, target, row.status].filter(Boolean).join(" · ");
     item.querySelector(".btn-cancel").addEventListener("click", async () => {
       await fetch(`/api/schedule/${row.id}`, { method: "DELETE" });
       loadSchedules();
@@ -1100,7 +1150,8 @@ function renderUpcoming(rows) {
     item.className = "upcoming-item";
     const label = document.createElement("span");
     label.className = "upcoming-label";
-    label.textContent = row.label;
+    const target = scheduleTargetLabel(row);
+    label.textContent = target ? `${row.label} · ${target}` : row.label;
     const when = document.createElement("span");
     when.className = "upcoming-when";
     when.textContent = formatUpcomingWhen(new Date(row.run_at * 1000));
@@ -1117,7 +1168,7 @@ function renderUpcoming(rows) {
 const WEAK_SIGNAL_DBM = -110; // below this the radio link is worth a look
 
 async function loadUnits() {
-  if (activeInst == null) return;
+  if (activeInst === null) return;
   try {
     const res = await fetch(`/api/installations/${activeInst}/units`);
     if (!res.ok) return;
@@ -1165,8 +1216,14 @@ function unitCommand(group, unit, command) {
   return postJson(`/api/installations/${activeInst}/units/${group}/${unit}/cmd`, { command });
 }
 
+// With a firmware 1.x device active the same button asks it for a STA (it has
+// no units to roll-call); the reply shows in the Status tab.
 document.getElementById("refreshUnitsBtn").addEventListener("click", (e) => {
-  runButton(e.currentTarget, () => postJson(`/api/installations/${activeInst}/refresh`));
+  runButton(e.currentTarget, () =>
+    activeLegacy !== null
+      ? postJson(`/api/legacy/${encodeURIComponent(activeLegacy)}/status`)
+      : postJson(`/api/installations/${activeInst}/refresh`)
+  );
 });
 
 function fmt(value, decimals, unit) {
@@ -1179,9 +1236,28 @@ function unitHealth(u, masterOnline) {
   return { text: "en línea", cls: "ok" };
 }
 
+function renderLegacyUnit(view) {
+  const t = targets.find((x) => x.target === activeTarget);
+  const section = el("section", "unit-group");
+  const header = el("div", "unit-group-header");
+  header.appendChild(el("h2", "", t?.label || activeLegacy));
+  header.appendChild(el("span", "unit-badge dim", "firmware 1.x"));
+  section.appendChild(header);
+  section.appendChild(el("p", "upcoming-empty",
+    "Equipo con firmware anterior: no reporta unidades ni órdenes numeradas. " +
+    "\"Solicitar estado\" le pide un STA; la respuesta aparece en la pestaña Status."));
+  view.appendChild(section);
+}
+
 function renderUnits() {
   const view = document.getElementById("unitsView");
   view.innerHTML = "";
+  document.getElementById("refreshUnitsBtn").textContent =
+    activeLegacy !== null ? "Solicitar estado" : "Actualizar unidades";
+  if (activeLegacy !== null) {
+    renderLegacyUnit(view);
+    return;
+  }
   const snap = unitsByInst[activeInst];
   if (!snap) return;
 

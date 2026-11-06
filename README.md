@@ -14,11 +14,13 @@ app/
   manager.py          installation manager: validates, numbers and publishes orders
   mqtt_client.py      paho-mqtt wrapper: subscribe, route by topic, send orders, websocket fan-out
   device_state.py     what each installation shows + per-unit health
+  legacy.py           firmware 1.x devices (the NQN column) until they're replaced
   scheduler.py        APScheduler wrapper, persisted via sqlite, re-arms on restart
   models.py            request/response pydantic models
   routes/
     commands.py        GET profile, POST send command / order
-    installations.py   installations, units table, maintenance (ROL/STA)
+    installations.py   targets (installations + legacy devices), units table, maintenance (ROL/STA)
+    legacy.py           firmware 1.x device state, manual STA
     logs.py             GET history, WS live tail
     schedule.py         CRUD for scheduled commands
   static/              vanilla JS + CSS frontend (no build step)

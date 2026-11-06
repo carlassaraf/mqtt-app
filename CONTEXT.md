@@ -76,6 +76,19 @@ command goes out as part of a numbered **order**:
 
 See `docs/ARCHITECTURE.md` §12 in the firmware repo for the design.
 
+**Firmware 1.x devices (temporary): the NQN column.** Until it's replaced,
+the NQN unit still runs the old firmware, listed under `legacy_devices` in
+config.json (`command_topic` `columna/led`, `log_topic` `columna/log`,
+`status_tag` `COL-02`). `app/legacy.py` drives it the old way: plain
+commands one by one on its command topic, at least 0.3 s apart (the old
+firmware garbles faster bursts), no numbering, and its display state
+assumed from what was sent and overwritten by its text STA replies (the old
+two-dialect regex parser lives there now). It shows up in the same topbar
+selector as the installations (targets `inst:<n>` / `legacy:<id>`), and
+schedules remember the target they were created for. In the Unidades tab it
+only gets a "Solicitar estado" (manual STA) button. When it's replaced,
+remove it from `legacy_devices`; with that list empty nothing of this runs.
+
 ## The device protocol (Columna RGB) — from the client's own guide
 
 Format: **3-letter command + optional value, no separators**
@@ -134,6 +147,7 @@ app/
   manager.py            installation manager: validates, numbers (v), publishes and stores orders
   mqtt_client.py        paho-mqtt wrapper + build_payload() + send_order() + topic routing + websocket fan-out
   device_state.py        what each installation shows (from the orders sent) + per-unit health (from the retained statuses)
+  legacy.py              firmware 1.x devices (NQN) until replaced: paced plain commands, STA reply parsing
   scheduler.py           APScheduler wrapper, sqlite-persisted, re-arms on restart; each state fires as one order
   network_status.py       reads active default-route interface (wifi/lte/ethernet) for /api/status
   models.py               SendCommandRequest / ScheduleRequest (label + ordered list of commands, i.e. a "state")

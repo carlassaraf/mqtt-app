@@ -5,8 +5,11 @@ Wraps paho-mqtt in a small manager:
   routes each message by topic: log lines to sqlite + the log file + the
   live log view, unit statuses / hello / online to device_state, versions
   to the installation manager, SMS orders from cmd/in to the manager
+- also subscribes to the log topic of every firmware 1.x device still in
+  use (legacy_devices in config.json) and hands those messages to legacy.py
 - exposes send_order() for the UI / scheduler, which builds each command
-  string with build_payload() and hands the order to manager.submit()
+  string with build_payload() and hands the order to manager.submit() -- or,
+  for a legacy device, sends the commands one by one through legacy.send()
 
 paho's callbacks run on paho's own network thread, not the asyncio event
 loop, so we hop into the loop with call_soon_threadsafe when we need to
@@ -19,7 +22,7 @@ import threading
 
 import paho.mqtt.client as mqtt
 
-from app import device_state, manager
+from app import device_state, legacy, manager
 from app.config import INSTALLATIONS, MQTT_CFG, TOPIC_PREFIX
 from app.db import insert_log
 from app.message_log import log_message
@@ -31,11 +34,12 @@ _loop: asyncio.AbstractEventLoop | None = None
 _client: mqtt.Client | None = None
 _connected = False
 
-# Which installation the UI's commands go to -- see set_active_installation().
-# Not persisted across restarts on purpose (this is a single kiosk, not a
-# fleet), so it always starts on the first configured installation.
+# What the UI's commands go to (a "target"): an installation, "inst:1"
+# (firmware 2.0), or a firmware 1.x device, "legacy:nqn". Not persisted
+# across restarts on purpose (this is a single kiosk, not a fleet), so it
+# always starts on the first configured installation.
 _installations_by_inst = {i["inst"]: i for i in INSTALLATIONS}
-_active_inst = INSTALLATIONS[0]["inst"]
+_active_target = f"inst:{INSTALLATIONS[0]['inst']}"
 
 # Maintenance commands for one unit, on <prefix>/<inst>/<group>/<unit>/cmd.
 # STA works for any unit; ROL (roll call of the whole group) only for the
@@ -56,17 +60,49 @@ def get_installations() -> list[dict]:
     return [{"inst": i["inst"], "label": i["label"], "groups": i["groups"]} for i in INSTALLATIONS]
 
 
-def get_active_inst() -> int:
-    return _active_inst
+def parse_target(target: str | None) -> tuple[str, int | str] | None:
+    """"inst:1" -> ("inst", 1), "legacy:nqn" -> ("legacy", "nqn"); None if it
+    isn't a configured installation or legacy device."""
+    kind, _, key = str(target or "").partition(":")
+    if kind == "inst" and key.isdigit() and int(key) in _installations_by_inst:
+        return "inst", int(key)
+    if kind == "legacy" and legacy.is_known(key):
+        return "legacy", key
+    return None
 
 
-def set_active_installation(inst: int) -> bool:
-    """Switches which installation the UI's orders go to from here on.
-    Returns False for an unknown installation."""
-    global _active_inst
-    if inst not in _installations_by_inst:
+def get_targets() -> list[dict]:
+    """Everything the UI can send to: installations first, then legacy devices."""
+    return [
+        {"target": f"inst:{i['inst']}", "kind": "installation", "inst": i["inst"], "label": i["label"]}
+        for i in INSTALLATIONS
+    ] + [
+        {"target": f"legacy:{d['id']}", "kind": "legacy", "id": d["id"], "label": d["label"]}
+        for d in legacy.get_devices()
+    ]
+
+
+def target_label(target: str | None) -> str | None:
+    return next((t["label"] for t in get_targets() if t["target"] == target), None)
+
+
+def get_active_target() -> str:
+    return _active_target
+
+
+def get_active_inst() -> int | None:
+    """The active installation, or None while a legacy device is active."""
+    kind, key = parse_target(_active_target)
+    return key if kind == "inst" else None
+
+
+def set_active_target(target: str) -> bool:
+    """Switches what the UI's commands go to from here on. Returns False for
+    an unknown target."""
+    global _active_target
+    if parse_target(target) is None:
         return False
-    _active_inst = inst
+    _active_target = target
     return True
 
 
@@ -133,12 +169,14 @@ def _on_connect(client, userdata, flags, reason_code, properties=None):
     _connected = reason_code == 0
     if _connected:
         topics = [(f"{TOPIC_PREFIX}/{inst}/#", MQTT_CFG.get("qos", 1)) for inst in _installations_by_inst]
+        topics += [(topic, MQTT_CFG.get("qos", 1)) for topic in legacy.LOG_TOPICS]
         logger.info("MQTT connected, subscribing to %s", ", ".join(t for t, _ in topics))
         client.subscribe(topics)
         manager.mark_subscribed()
         # Retained statuses arrive on their own right after subscribing; a
-        # roll call on top makes them fresh. On its own thread: publishing's
-        # failure path reconnects, which mustn't happen inside paho's callback.
+        # roll call on top makes them fresh, and legacy devices get a STA.
+        # On its own thread: publishing's failure path reconnects, which
+        # mustn't happen inside paho's callback.
         threading.Thread(target=request_status_all, daemon=True).start()
     else:
         logger.error("MQTT connect failed: %s", reason_code)
@@ -180,6 +218,13 @@ def _on_message(client, userdata, msg):
 
 
 def _route(topic: str, payload: str, retained: bool):
+    if topic in legacy.LOG_TOPICS:
+        insert_log(topic, payload)
+        log_message(topic, payload)
+        if legacy.handle_log(payload):
+            _broadcast({"topic": topic, "payload": payload})
+        return
+
     parsed = _parse_topic(topic)
     if parsed is None:
         return
@@ -274,6 +319,7 @@ def start(loop: asyncio.AbstractEventLoop):
     _client.on_message = _on_message
 
     manager.set_publisher(_publish)
+    legacy.set_io(_publish, _broadcast)
     _client.connect_async(MQTT_CFG["host"], MQTT_CFG["port"], keepalive=30)
     _client.loop_start()
 
@@ -369,15 +415,26 @@ def validate_order(commands: list[tuple[str, object]]) -> str | None:
     return manager.validate_order([build_payload(cid, value) for cid, value in commands])
 
 
-def send_order(inst: int | None, commands: list[tuple[str, object]], source: str = "ui") -> tuple[bool, int | str]:
-    """Sends [(command_id, value), ...] as one order to an installation (the
-    active one if inst is None); all of them are applied together.
+def send_order(
+    target: str | None, commands: list[tuple[str, object]], source: str = "ui"
+) -> tuple[bool, int | str | None]:
+    """Sends [(command_id, value), ...] to a target (the active one if None).
+    To an installation it's one order, all of it applied together; to a
+    legacy device, the commands one by one, paced.
 
-    Returns (True, v) with the order's version, or (False, error) with a
-    user-facing error in Spanish.
+    Returns (True, v) with the order's version (None for a legacy device,
+    which has no versions), or (False, error) with a user-facing error in
+    Spanish.
     """
-    inst = _active_inst if inst is None else inst
-    return _submit(inst, [build_payload(cid, value) for cid, value in commands], source)
+    parsed = parse_target(target or _active_target)
+    if parsed is None:
+        return False, "Destino desconocido."
+    kind, key = parsed
+    cmds = [build_payload(cid, value) for cid, value in commands]
+    if kind == "legacy":
+        ok, error = legacy.send(key, cmds)
+        return (True, None) if ok else (False, error)
+    return _submit(key, cmds, source)
 
 
 def validate_unit_command(unit: int, command: str) -> str | None:
@@ -414,8 +471,9 @@ def request_units_refresh(inst: int) -> tuple[bool, str]:
 
 
 def request_status_all():
-    """Roll call of every group of every configured installation.
-    Fire-and-forget: the statuses update device_state whenever -- if ever --
-    they arrive."""
+    """Roll call of every group of every configured installation, and a STA
+    to every legacy device. Fire-and-forget: the statuses update the state
+    whenever -- if ever -- they arrive."""
     for inst in _installations_by_inst:
         request_units_refresh(inst)
+    legacy.request_status_all()

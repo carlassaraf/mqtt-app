@@ -27,12 +27,12 @@ from app.config import INSTALLATIONS
 # Commands whose value is a lasting display property worth showing on its
 # card. CLR/NET/STA are actions, not properties, so they're never recorded.
 # AUT and INV take no value but still get a 1/0 state: AUT while the loop
-# runs, INV while rotation is inverted (see _side_effects).
+# runs, INV while rotation is inverted (see side_effects).
 TRACKED_COMMAND_IDS = {"FRM", "BRI", "BLK", "ROT", "PPG", "PPC", "PPK", "SCR", "SCL", "OUT", "FIL", "OVR"}
 
 # The firmware's modes, one flag each; these commands' on/off states mirror
 # them. The modes are mutually exclusive: turning one on turns the rest off.
-_MODE_COMMAND_IDS = ("AUT", "PPG", "SCR", "FIL")
+MODE_COMMAND_IDS = ("AUT", "PPG", "SCR", "FIL")
 
 # Sending any of these pauses automatic mode until AUT is sent again.
 _PAUSES_AUTOMATIC = {"FRM", "BRI", "BLK", "ROT", "INV"}
@@ -64,7 +64,7 @@ def split_command(cmd: str) -> tuple[str, str | None]:
     return cmd[:3], (cmd[3:] or None)
 
 
-def _normalize(command_id: str, value):
+def normalize_value(command_id: str, value):
     """Same value shapes the frontend sends: ints for numeric/toggle commands,
     uppercase hex without '#' for colors."""
     if command_id in ("PPC", "PPK", "SCL"):
@@ -72,15 +72,15 @@ def _normalize(command_id: str, value):
     return int(value)
 
 
-def _side_effects(command_id: str, value, current: dict) -> dict:
+def side_effects(command_id: str, value, current: dict) -> dict:
     """State changes a command causes beyond its own value. AUT (no value)
     and PPG1/SCR1/FIL1 switch to their mode and turn the other modes off;
     FRM/BRI/BLK/ROT/INV pause automatic mode; INV flips the rotation
     direction, when it's known at all."""
     if command_id == "AUT":
         value = 1
-    if command_id in _MODE_COMMAND_IDS and value == 1:
-        return {mode: int(mode == command_id) for mode in _MODE_COMMAND_IDS}
+    if command_id in MODE_COMMAND_IDS and value == 1:
+        return {mode: int(mode == command_id) for mode in MODE_COMMAND_IDS}
     effects = {}
     if command_id in _PAUSES_AUTOMATIC:
         effects["AUT"] = 0
@@ -109,10 +109,10 @@ def _apply(inst: int, command_id: str, value) -> bool:
     updates = {}
     if command_id in TRACKED_COMMAND_IDS and value is not None and value != "":
         try:
-            updates[command_id] = _normalize(command_id, value)
+            updates[command_id] = normalize_value(command_id, value)
         except (TypeError, ValueError):
             return False
-    updates.update(_side_effects(command_id, updates.get(command_id), state))
+    updates.update(side_effects(command_id, updates.get(command_id), state))
     if not updates:
         return False
     if command_id in _SNAPSHOT_BEFORE:

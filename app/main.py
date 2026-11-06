@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app import db, device_state, manager, mqtt_client, network_status, scheduler
-from app.routes import commands, installations, logs, schedule, system
+from app.routes import commands, installations, legacy, logs, schedule, system
 from app.version import VERSION
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -19,6 +19,7 @@ templates = Jinja2Templates(directory="app/templates")
 
 app.include_router(commands.router)
 app.include_router(installations.router)
+app.include_router(legacy.router)
 app.include_router(logs.router)
 app.include_router(schedule.router)
 app.include_router(system.router)

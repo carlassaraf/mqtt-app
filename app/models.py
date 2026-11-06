@@ -18,8 +18,8 @@ class SendOrderRequest(BaseModel):
     commands: list[OrderCommand]  # applied together, as one order
 
 
-class SelectInstallationRequest(BaseModel):
-    inst: int
+class SelectTargetRequest(BaseModel):
+    target: str  # "inst:1" (an installation) or "legacy:nqn" (a firmware 1.x device)
 
 
 class UnitCommandRequest(BaseModel):

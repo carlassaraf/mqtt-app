@@ -15,8 +15,8 @@ from datetime import datetime
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from app import db
-from app.mqtt_client import broadcast_event, is_connected, send_order
+from app import db, legacy
+from app.mqtt_client import broadcast_event, get_active_target, is_connected, send_order
 
 logger = logging.getLogger("scheduler")
 scheduler = BackgroundScheduler()
@@ -36,13 +36,22 @@ MISSED_SCHEDULE_CATCHUP_S = 16 * 3600
 CATCHUP_CONNECT_TIMEOUT_S = 30
 CATCHUP_POLL_INTERVAL_S = 1
 
+# Firmware 1.x devices (legacy.py) don't report their state on their own.
+# A STA this often catches drift (someone changing the device over SMS, a
+# reboot into automatic mode); in automatic mode the frame changes on its own
+# every ~2 minutes, so those devices are asked on that period.
+LEGACY_STATUS_REFRESH_INTERVAL_S = 3600
+LEGACY_AUTOMATIC_STATUS_REFRESH_INTERVAL_S = 120
 
-def _run_job(schedule_id: int, label: str, commands: list[dict]):
-    """Sends the whole state as one order to the active installation: every
-    unit applies all of its commands together, at the same instant. Runs on
-    APScheduler's own worker thread."""
+
+def _run_job(schedule_id: int, label: str, commands: list[dict], target: str | None = None):
+    """Sends the whole state to the target it was created for (the active one
+    for rows from before targets were stored): to an installation as one
+    order, every unit applying all of its commands together at the same
+    instant; to a legacy device one by one, paced. Runs on APScheduler's own
+    worker thread."""
     ok, result = send_order(
-        None, [(cmd["command_id"], cmd.get("value")) for cmd in commands], source="schedule"
+        target, [(cmd["command_id"], cmd.get("value")) for cmd in commands], source="schedule"
     )
     status = "sent" if ok else "failed"
     db.mark_schedule(schedule_id, status)
@@ -54,12 +63,14 @@ def _run_job(schedule_id: int, label: str, commands: list[dict]):
 
 
 def add_scheduled_command(label: str, commands: list[dict], run_at: datetime) -> int:
-    schedule_id = db.insert_schedule(label, json.dumps(commands), run_at.timestamp())
+    """Schedules a state for the target that's active right now."""
+    target = get_active_target()
+    schedule_id = db.insert_schedule(label, json.dumps(commands), run_at.timestamp(), target)
     scheduler.add_job(
         _run_job,
         "date",
         run_date=run_at,
-        args=[schedule_id, label, commands],
+        args=[schedule_id, label, commands, target],
         id=str(schedule_id),
         misfire_grace_time=3600,
     )
@@ -77,21 +88,30 @@ def remove_scheduled_command(schedule_id: int):
 def start():
     scheduler.start()
     _rearm_pending()
+    if legacy.LOG_TOPICS:
+        scheduler.add_job(
+            legacy.request_status_all, "interval", seconds=LEGACY_STATUS_REFRESH_INTERVAL_S,
+            id="legacy_status_refresh",
+        )
+        scheduler.add_job(
+            legacy.request_status_automatic, "interval", seconds=LEGACY_AUTOMATIC_STATUS_REFRESH_INTERVAL_S,
+            id="legacy_automatic_status_refresh",
+        )
 
 
-def _wait_for_mqtt_then_catch_up(catchup: list[tuple[int, str, list[dict]]]):
+def _wait_for_mqtt_then_catch_up(catchup: list[tuple[int, str, list[dict], str | None]]):
     """Runs on its own thread at startup. Waits (briefly, with a timeout) for
     MQTT to connect, then fires each missed-but-recent schedule in
     chronological order -- if several were missed, the last one firing last
     is correct, it's exactly what would have happened had the device stayed
-    on overnight. Each one is its own numbered order, so they're applied in
-    sequence without any pacing."""
+    on overnight. Each one is its own numbered order (or, for a legacy
+    device, its own paced commands), so they're applied in sequence."""
     waited = 0
     while not is_connected() and waited < CATCHUP_CONNECT_TIMEOUT_S:
         time.sleep(CATCHUP_POLL_INTERVAL_S)
         waited += CATCHUP_POLL_INTERVAL_S
-    for schedule_id, label, commands in catchup:
-        _run_job(schedule_id, label, commands)
+    for schedule_id, label, commands, target in catchup:
+        _run_job(schedule_id, label, commands, target)
 
 
 def _rearm_pending():
@@ -101,7 +121,7 @@ def _rearm_pending():
         commands = json.loads(row["commands_json"])
         if row["run_at"] <= now:
             if now - row["run_at"] <= MISSED_SCHEDULE_CATCHUP_S:
-                catchup.append((row["id"], row["label"], commands))
+                catchup.append((row["id"], row["label"], commands, row["target"]))
             else:
                 db.mark_schedule(row["id"], "missed")
             continue
@@ -109,7 +129,7 @@ def _rearm_pending():
             _run_job,
             "date",
             run_date=datetime.fromtimestamp(row["run_at"]),
-            args=[row["id"], row["label"], commands],
+            args=[row["id"], row["label"], commands, row["target"]],
             id=str(row["id"]),
             misfire_grace_time=3600,
         )

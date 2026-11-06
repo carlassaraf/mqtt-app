@@ -18,7 +18,8 @@ def get_command_profile():
 
 @router.post("/send")
 def send_command(req: SendCommandRequest):
-    """One command, as a one-command order to the active installation."""
+    """One command, to the active target (a one-command order to an
+    installation, or the plain command to a legacy device)."""
     commands = [(req.command_id, req.value)]
     error = validate_order(commands)
     if error:
@@ -31,8 +32,9 @@ def send_command(req: SendCommandRequest):
 
 @router.post("/order")
 def send_command_order(req: SendOrderRequest):
-    """Several commands (e.g. a quick preset), as one order to the active
-    installation: every unit applies them together."""
+    """Several commands (e.g. a quick preset) to the active target: one order
+    to an installation (every unit applies them together), or one by one,
+    paced, to a legacy device."""
     commands = [(c.command_id, c.value) for c in req.commands]
     error = validate_order(commands)
     if error:

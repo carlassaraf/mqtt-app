@@ -11,6 +11,15 @@
   "installations": [
     { "inst": 1, "label": "Prueba (5 unidades)", "groups": [1] }
   ],
+  "legacy_devices": [
+    {
+      "id": "nqn",
+      "label": "Columna NQN (firmware 1.x)",
+      "command_topic": "columna/led",
+      "log_topic": "columna/log",
+      "status_tag": "COL-02"
+    }
+  ],
   "app": {
     "db_path": "data/app.db",
     "profile_path": "profiles/device_commands.json",
