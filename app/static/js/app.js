@@ -1211,16 +1211,6 @@ function renderUnits() {
       : g.online === false ? ["maestro desconectado", "bad"] : ["maestro sin datos", "dim"];
     header.appendChild(el("span", `unit-badge ${masterState[1]}`, masterState[0]));
     if (g.hello?.fw) header.appendChild(el("span", "unit-meta", `fw ${g.hello.fw}`));
-
-    // NET0 turns off the master's data connection: from then on it's
-    // unreachable over MQTT, and only an SMS (NET1) brings it back.
-    const netBtn = el("button", "unit-action danger", "Cortar datos (NET0)");
-    netBtn.type = "button";
-    netBtn.addEventListener("click", () => {
-      if (!confirm(`¿Desactivar la conexión de datos del maestro del grupo ${g.group}? Solo se puede volver a activar por SMS (NET1).`)) return;
-      runButton(netBtn, () => unitCommand(g.group, 0, "NET0"));
-    });
-    header.appendChild(netBtn);
     section.appendChild(header);
 
     if (g.units.length === 0) {

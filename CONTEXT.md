@@ -72,8 +72,7 @@ command goes out as part of a numbered **order**:
   state (frame 3, 70%, 100 ms rotation, loop off) and rebuilt from the stored
   orders on restart. There's no status parsing any more.
 - Maintenance goes to one unit on `<prefix>/<inst>/<group>/<unit>/cmd`:
-  `STA` (fresh status), `ROL` (roll call of a group, unit 0 only) and `NET0`
-  (a master's data connection, unit 0 only).
+  `STA` (fresh status) and `ROL` (roll call of a group, unit 0 only).
 
 See `docs/ARCHITECTURE.md` §12 in the firmware repo for the design.
 
@@ -101,7 +100,7 @@ the whole string regardless of input casing.
 | `OUT` / `OVR` | Status LED / input-gate override | `0`/`1` | |
 | `STA` | Fresh status of one unit | none | Maintenance, not an order (Unidades tab) |
 | `ROL` | Roll call of a whole group | none | Maintenance, group master only |
-| `NET` | Enable/disable a master's data connection | `0`/`1` | Maintenance, group master only. **`NET1` only via SMS** (the master is offline from MQTT's view after `NET0`); the Unidades tab offers `NET0` behind a confirm dialog |
+| `NET` | Enable/disable a master's data connection | `0`/`1` | Admin command, **not available in this app** (it's for operators). `NET1` only works via SMS anyway (the master is offline from MQTT's view after `NET0`) |
 
 Sending `FRM`/`BRI`/`BLK`/`ROT`/`INV`/`PPG1` pauses automatic mode until
 `AUT` is sent or the device reboots.
@@ -120,7 +119,8 @@ two connections on collision.
   `cmd/in`, and the manager numbers them like any other order.
   Worth asking the client if they want SMS notification visibility surfaced
   in the UI too.
-- `NET1` — SMS-only per the device's own design, deliberately not offered.
+- `NET` — an admin command (a master's data connection), deliberately not
+  offered in this operator app; `NET1` is SMS-only anyway.
 - Any auth/access control on the broker itself — it's public, the device's
   own input validation is the real safety net.
 
@@ -139,7 +139,7 @@ app/
   models.py               SendCommandRequest / ScheduleRequest (label + ordered list of commands, i.e. a "state")
   routes/
     commands.py            GET profile, POST send (one command) / order (several, applied together)
-    installations.py         list/select installation, display state, units table, ROL / STA / NET0
+    installations.py         list/select installation, display state, units table, ROL / STA
     logs.py                  GET history, WS live tail (/ws/logs)
     schedule.py              CRUD scheduled commands
   static/js/app.js       all frontend logic (single-value-per-command rendering), UI is in Spanish

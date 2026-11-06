@@ -61,7 +61,7 @@ def refresh_units(inst: int):
 
 @router.post("/{inst}/units/{group}/{unit}/cmd")
 def unit_command(inst: int, group: int, unit: int, req: UnitCommandRequest):
-    """Maintenance for one unit: STA, or ROL / NET0 for a group master."""
+    """Maintenance for one unit: STA, or ROL for a group master."""
     _check_inst(inst)
     error = validate_unit_command(unit, req.command)
     if error:

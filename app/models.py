@@ -23,7 +23,7 @@ class SelectInstallationRequest(BaseModel):
 
 
 class UnitCommandRequest(BaseModel):
-    command: str  # STA, or ROL / NET0 / NET1 for a group master (unit 0)
+    command: str  # STA, or ROL for a group master (unit 0)
 
 
 class ScheduleRequest(BaseModel):

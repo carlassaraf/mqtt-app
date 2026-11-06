@@ -18,7 +18,7 @@ app/
   models.py            request/response pydantic models
   routes/
     commands.py        GET profile, POST send command / order
-    installations.py   installations, units table, maintenance (ROL/STA/NET0)
+    installations.py   installations, units table, maintenance (ROL/STA)
     logs.py             GET history, WS live tail
     schedule.py         CRUD for scheduled commands
   static/              vanilla JS + CSS frontend (no build step)
@@ -70,7 +70,7 @@ Supported `value_type`s: `slider`, `number`, `hex_color` (color picker,
 `#` stripped automatically), `toggle` (renders 0/1), and `none` (no input --
 `INV`, `AUT`). Only display commands belong in the profile: they're sent as
 numbered orders to a whole installation (firmware 2.0, see `CONTEXT.md`).
-Unit maintenance (`STA`, `ROL`, `NET0`) lives in the Unidades tab. A `fixed_value` field (used for `NET`) skips the input
+Unit maintenance (`STA`, `ROL`) lives in the Unidades tab. A `fixed_value` field skips the input
 entirely and always sends that exact value; pair it with `"confirm": true` +
 `"confirm_text"` to force a confirmation dialog before sending.
 
@@ -87,10 +87,10 @@ entirely and always sends that exact value; pair it with `"confirm": true` +
   phone numbers. That's independent of this app and not wired in here --
   worth asking the client whether they want SMS visibility in the UI too
   (e.g. showing the same notifications this app can't see).
-- **`NET1`.** Only sendable via SMS by design (a master is offline from
-  MQTT's perspective once `NET0` is sent), so it isn't offered at all --
-  only `NET0` is, per group master in the Unidades tab, gated behind a
-  confirmation dialog since it's a one-way door from this app's perspective.
+- **`NET`.** Turning a master's data connection off and on is an admin
+  command, not an operator one, so this app doesn't offer it at all (the API
+  rejects it too). `NET1` only works via SMS anyway, since a master is
+  offline from MQTT's perspective once `NET0` is sent.
 - **Public broker, no auth.** `broker.hivemq.com` has no username/password,
   so anyone who knows the topic name can publish to it -- the device's own
   input validation is the real safety net, not the broker. Worth knowing if

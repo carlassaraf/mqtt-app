@@ -1,6 +1,6 @@
 {
   "device_name": "Columna RGB",
-  "notes": "Commands are 3 letters + value, no separators, sent UPPERCASE over MQTT (e.g. FRM5, BRI70, PPCFF0000). The backend builds and uppercases the final string -- the UI only needs to collect the value. Only display commands belong here: they're sent as numbered orders to the whole installation. Unit maintenance (STA, ROL, NET0) lives in the Unidades tab.",
+  "notes": "Commands are 3 letters + value, no separators, sent UPPERCASE over MQTT (e.g. FRM5, BRI70, PPCFF0000). The backend builds and uppercases the final string -- the UI only needs to collect the value. Only display commands belong here: they're sent as numbered orders to the whole installation. Unit maintenance (STA, ROL) lives in the Unidades tab.",
   "commands": [
     {
       "id": "FRM",

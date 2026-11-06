@@ -38,10 +38,11 @@ _installations_by_inst = {i["inst"]: i for i in INSTALLATIONS}
 _active_inst = INSTALLATIONS[0]["inst"]
 
 # Maintenance commands for one unit, on <prefix>/<inst>/<group>/<unit>/cmd.
-# STA works for any unit; ROL (roll call of the whole group) and NET (the
-# master's data connection) only for the group's master, unit 0.
+# STA works for any unit; ROL (roll call of the whole group) only for the
+# group's master, unit 0. NET (a master's data connection) is an admin
+# command, deliberately not available from this operator app.
 _UNIT_COMMANDS = {"STA"}
-_MASTER_COMMANDS = {"ROL", "NET0", "NET1"}
+_MASTER_COMMANDS = {"ROL"}
 
 # Statuses arrive in bursts (every retained one right after subscribing, a
 # whole group after a roll call), so the units table is pushed to the UI at
@@ -392,8 +393,7 @@ def validate_unit_command(unit: int, command: str) -> str | None:
 
 def send_unit_command(inst: int, group: int, unit: int, command: str) -> tuple[bool, str]:
     """Maintenance for one unit: STA (fresh status), or, for a group master
-    (unit 0), ROL (roll call of the whole group) and NET0/NET1 (its data
-    connection)."""
+    (unit 0), ROL (roll call of the whole group)."""
     error = validate_unit_command(unit, command)
     if error:
         return False, error

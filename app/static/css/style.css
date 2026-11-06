@@ -201,7 +201,6 @@ button.primary.units-refresh.error { background: var(--danger); }
 .unit-badge.bad { color: var(--danger); }
 .unit-badge.dim { color: var(--text-dim); }
 .unit-meta { font-family: var(--font-mono); font-size: 16px; color: var(--text-dim); }
-.unit-group-header .unit-action { margin-left: auto; }
 .units-table { width: 100%; border-collapse: collapse; font-size: 19px; }
 .units-table th {
   text-align: left; font-size: 15px; font-weight: 500; color: var(--text-dim);
@@ -222,7 +221,6 @@ button.primary.units-refresh.error { background: var(--danger); }
   appearance: none; -webkit-appearance: none;
 }
 .unit-action:active { border-color: var(--accent); }
-.unit-action.danger { color: var(--danger); border-color: var(--danger); }
 .unit-action.sending { opacity: .6; }
 .unit-action.sent { border-color: var(--green); color: var(--green); }
 .unit-action.error { border-color: var(--danger); background: var(--danger); color: var(--bg); }
