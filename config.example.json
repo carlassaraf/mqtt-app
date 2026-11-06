@@ -5,13 +5,12 @@
     "client_id": "led-kiosk-controller",
     "username": null,
     "password": null,
-    "qos": 1,
-    "log_topic": "columna/log",
-    "devices": [
-      { "id": "columna1", "label": "Columna 1 (NQN)", "command_topic": "columna/led", "status_tag": "COL-02" },
-      { "id": "columna2", "label": "Columna 2 (Demo)", "command_topic": "columna/demo" }
-    ]
+    "qos": 1
   },
+  "topic_prefix": "columna",
+  "installations": [
+    { "inst": 1, "label": "Prueba (5 unidades)", "groups": [1] }
+  ],
   "app": {
     "db_path": "data/app.db",
     "profile_path": "profiles/device_commands.json",

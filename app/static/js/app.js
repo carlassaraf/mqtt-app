@@ -87,48 +87,53 @@ document.addEventListener("focusin", (e) => {
   keypadBackdrop.classList.add("open");
 });
 
-// ---------- device selector ----------
-// Two (or more) physical columns share one broker but each publishes/
-// subscribes on its own pair of topics (see config.json's mqtt.devices).
-// Switching here changes which topics the whole app talks to: commands sent
-// from any tab, and which device's traffic shows up in the Status log view.
-async function loadDevices() {
-  const select = document.getElementById("deviceSelect");
+// ---------- installation selector ----------
+// Firmware 2.0 is addressed per installation: every order goes to all of its
+// units at once (see config.json's installations). Switching here changes
+// which installation the whole app talks to: orders sent from any tab, the
+// values on the command cards and the Unidades tab.
+let installations = [];
+
+async function loadInstallations() {
+  const select = document.getElementById("installationSelect");
   try {
-    const res = await fetch("/api/devices");
+    const res = await fetch("/api/installations");
     const data = await res.json();
+    installations = data.installations;
     select.innerHTML = "";
-    for (const device of data.devices) {
+    for (const inst of installations) {
       const opt = document.createElement("option");
-      opt.value = device.id;
-      opt.textContent = device.label;
+      opt.value = inst.inst;
+      opt.textContent = inst.label;
       select.appendChild(opt);
     }
-    select.value = data.active_id;
-    select.dataset.current = data.active_id;
-    activeDeviceId = data.active_id;
+    select.value = data.active_inst;
+    select.dataset.current = data.active_inst;
+    activeInst = data.active_inst;
     refreshCommandGlyphs();
+    loadUnits();
   } catch {
     // backend not reachable yet -- leave the select empty, nothing to pick
   }
 }
 
-document.getElementById("deviceSelect").addEventListener("change", async (e) => {
+document.getElementById("installationSelect").addEventListener("change", async (e) => {
   const select = e.target;
   const previous = select.dataset.current;
   select.disabled = true;
   try {
-    const res = await fetch("/api/devices/select", {
+    const res = await fetch("/api/installations/select", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ device_id: select.value }),
+      body: JSON.stringify({ inst: Number(select.value) }),
     });
     if (!res.ok) throw new Error();
     select.dataset.current = select.value;
-    activeDeviceId = select.value;
+    activeInst = Number(select.value);
     refreshCommandGlyphs();
+    loadUnits();
   } catch {
-    select.value = previous; // switch failed -- stay on the previous device
+    select.value = previous; // switch failed -- stay on the previous installation
   }
   select.disabled = false;
 });
@@ -200,7 +205,7 @@ tickClock();
 
 // ---------- single-value field rendering (shared by command sheet + schedule form) ----------
 // Returns { el, getValue } or null if the command takes no value at all
-// (value_type "none" with no fixed_value -- e.g. INV, AUT, STA).
+// (value_type "none" with no fixed_value -- e.g. INV, AUT, CLR).
 function renderValueField(cmd) {
   if (cmd.fixed_value !== undefined) {
     const note = document.createElement("p");
@@ -342,13 +347,15 @@ function renderCommandGrid(gridId, commands) {
   refreshCommandGlyphs();
 }
 
-// Read-only sensor readings from the STA reply, shown as cards at the end of
-// the "Comandos" grid. Same look as a command card, but not tappable -- there's
-// no command behind them. Their ids are device_state.py's keys for each reading.
+// Read-only sensor readings, shown as cards at the end of the "Comandos" grid.
+// Same look as a command card, but not tappable -- there's no command behind
+// them. Taken from the first group master's status (see sensorReadings());
+// every unit's own readings are in the Unidades tab.
 const SENSOR_INDICATORS = [
-  { id: "TMP", label: "Temperatura", value_type: "reading", unit: "°C", decimals: 1 },
-  { id: "HUM", label: "Humedad", value_type: "reading", unit: "%", decimals: 0 },
-  { id: "CUR", label: "Corriente", value_type: "reading", unit: "A", decimals: 2 },
+  { id: "TMP", label: "Temperatura", value_type: "reading", unit: "°C", decimals: 1, read: (u) => u.aht_temp_c },
+  { id: "HUM", label: "Humedad", value_type: "reading", unit: "%", decimals: 0, read: (u) => u.aht_hum },
+  { id: "CUR", label: "Corriente", value_type: "reading", unit: "A", decimals: 2,
+    read: (u) => (u.power_ma == null ? null : u.power_ma / 1000) },
 ];
 
 function renderIndicatorCards(gridId) {
@@ -362,22 +369,41 @@ function renderIndicatorCards(gridId) {
   refreshCommandGlyphs();
 }
 
-// ---------- last-known device values on the command cards ----------
-// The backend tracks each device's property values (app/device_state.py):
-// assumed from every command sent, overwritten by every STA reply. Cards
-// show that value in place of the letter (AUT/INV show ON/OFF for automatic
-// mode / inverted rotation); the letter stays for STA and anything not known yet.
-let activeDeviceId = null;
-let deviceStates = {}; // device id -> { command id -> value }
+// ---------- last-known installation values on the command cards ----------
+// The backend tracks what each installation shows (app/device_state.py),
+// following from the orders sent: every unit applies the same orders, so
+// they all show the same thing. Cards show that value in place of the letter
+// (AUT/INV show ON/OFF for automatic mode / inverted rotation); the letter
+// stays for anything not known yet.
+let activeInst = null;
+let installationStates = {}; // inst -> { command id -> value }
+let unitsByInst = {}; // inst -> units snapshot from /api/installations/{inst}/units
 
-async function loadDeviceStates() {
+async function loadInstallationStates() {
   try {
-    const res = await fetch("/api/devices/state");
-    deviceStates = await res.json();
+    const res = await fetch("/api/installations/state");
+    installationStates = await res.json();
     refreshCommandGlyphs();
   } catch {
     // backend not reachable yet -- cards keep their letters
   }
+}
+
+// The unit the sensor cards read from: the master (unit 0) of the lowest
+// group, falling back to any unit that reported at all.
+function referenceUnit(inst) {
+  const groups = unitsByInst[inst]?.groups || [];
+  for (const g of groups) {
+    const master = g.units.find((u) => u.unit === 0);
+    if (master) return master;
+  }
+  return groups.flatMap((g) => g.units)[0] || null;
+}
+
+function sensorReadings(inst) {
+  const unit = referenceUnit(inst);
+  if (!unit || unit.online === false) return {};
+  return Object.fromEntries(SENSOR_INDICATORS.map((i) => [i.id, i.read(unit)]));
 }
 
 function renderGlyph(glyph, cmd, value) {
@@ -415,7 +441,7 @@ function renderGlyph(glyph, cmd, value) {
 
 function refreshCommandGlyphs() {
   if (!profile) return;
-  const state = deviceStates[activeDeviceId] || {};
+  const state = { ...(installationStates[activeInst] || {}), ...sensorReadings(activeInst) };
   for (const glyph of document.querySelectorAll(".command-glyph[data-command-id]")) {
     const id = glyph.dataset.commandId;
     const cmd = getCmd(id) || SENSOR_INDICATORS.find((i) => i.id === id);
@@ -464,7 +490,7 @@ const COLOR_PRESETS = [
   ],
 }));
 
-// CLR is a single raw command with no value and no bundled AUT/FRM/BLK/ROT
+// CLR is a single command with no value and no bundled AUT/FRM/BLK/ROT
 // -- unlike the color presets above, so it doesn't fit COLOR_PRESETS's
 // frame/blink shape and is appended here as its own entry instead. It's not
 // in device_commands.json either, since (like the presets) it's only ever
@@ -474,28 +500,17 @@ const QUICK_PRESETS = [
   { label: "Restaurar", glyphChar: "↺", commands: [{ command_id: "CLR" }] },
 ];
 
-// Mirrors scheduler.py's INTER_COMMAND_DELAY_S: the device corrupts/misattributes
-// payloads when commands arrive faster than its ~100ms dispatch tick can drain
-// them, so successive commands in a sequence need a gap comfortably above that
-// tick instead of firing back-to-back. Scheduled states already pace themselves
-// server-side; this does the same for quick presets sent straight from the UI.
-const INTER_COMMAND_DELAY_MS = 300;
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function sendCommandSequence(commands) {
-  for (const [i, { command_id, value }] of commands.entries()) {
-    if (i > 0) await sleep(INTER_COMMAND_DELAY_MS);
-    const res = await fetch("/api/commands/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ command_id, value: value ?? null }),
-    });
-    if (!res.ok) return false;
-  }
-  return true;
+// A preset's commands go out as one order: every unit applies them together,
+// at the same instant, so no pacing between them is needed.
+async function sendOrder(commands) {
+  const res = await fetch("/api/commands/order", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      commands: commands.map(({ command_id, value }) => ({ command_id, value: value ?? null })),
+    }),
+  });
+  return res.ok;
 }
 
 function renderPresetGrid() {
@@ -522,7 +537,7 @@ function renderPresetGrid() {
       card.classList.add("sending");
       let ok = false;
       try {
-        ok = await sendCommandSequence(preset.commands);
+        ok = await sendOrder(preset.commands);
       } catch {
         ok = false;
       }
@@ -656,13 +671,22 @@ function showToast({ label, status }) {
 function connectLogSocket() {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   const ws = new WebSocket(`${proto}://${location.host}/ws/logs`);
-  // (Re)fetch the full card values on every (re)connect -- any device_state
-  // pushes sent while the socket was down were missed.
-  ws.onopen = loadDeviceStates;
+  // (Re)fetch the card values and units on every (re)connect -- any pushes
+  // sent while the socket was down were missed.
+  ws.onopen = () => {
+    loadInstallationStates();
+    loadUnits();
+  };
   ws.onmessage = (evt) => {
     const msg = JSON.parse(evt.data);
-    if (msg.type === "device_state") {
-      deviceStates[msg.device_id] = msg.state;
+    if (msg.type === "installation_state") {
+      installationStates[msg.inst] = msg.state;
+      refreshCommandGlyphs();
+      return;
+    }
+    if (msg.type === "units") {
+      unitsByInst[msg.inst] = msg;
+      if (msg.inst === activeInst) renderUnits();
       refreshCommandGlyphs();
       return;
     }
@@ -684,6 +708,7 @@ function connectLogSocket() {
 // ARCHITECTURE.md Â§4.1/Â§4.1.1/Â§4.1.2) -- otherwise a scheduled "frame" state
 // could still render as ping-pong if that mode was left on from an earlier
 // manual command. NET/STA/AUT/CON/DIS aren't states, so they're not offered here.
+// Each state goes out as one order when it fires (see scheduler.py).
 function getCmd(id) {
   return profile.commands.find((c) => c.id === id);
 }
@@ -1085,8 +1110,177 @@ function renderUpcoming(rows) {
   }
 }
 
+// ---------- units tab ----------
+// One row per (group, unit), from the retained JSON status each unit
+// publishes (every 5 minutes, and on request). "Actualizar unidades" sends a
+// roll call (ROL) to every group master; each row's STA asks one unit.
+const WEAK_SIGNAL_DBM = -110; // below this the radio link is worth a look
+
+async function loadUnits() {
+  if (activeInst == null) return;
+  try {
+    const res = await fetch(`/api/installations/${activeInst}/units`);
+    if (!res.ok) return;
+    unitsByInst[activeInst] = await res.json();
+    renderUnits();
+    refreshCommandGlyphs();
+  } catch {
+    // backend not reachable yet -- keep whatever is shown
+  }
+}
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text; // device data is untrusted: never innerHTML
+  return node;
+}
+
+// Same sending -> sent/error flash the command cards use, on any button.
+async function runButton(btn, action) {
+  if (btn.classList.contains("sending")) return;
+  btn.classList.remove("sent", "error");
+  btn.classList.add("sending");
+  let ok = false;
+  try {
+    ok = await action();
+  } catch {
+    ok = false;
+  }
+  btn.classList.remove("sending");
+  btn.classList.add(ok ? "sent" : "error");
+  setTimeout(() => btn.classList.remove("sent", "error"), 1200);
+}
+
+async function postJson(url, body) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  return res.ok;
+}
+
+function unitCommand(group, unit, command) {
+  return postJson(`/api/installations/${activeInst}/units/${group}/${unit}/cmd`, { command });
+}
+
+document.getElementById("refreshUnitsBtn").addEventListener("click", (e) => {
+  runButton(e.currentTarget, () => postJson(`/api/installations/${activeInst}/refresh`));
+});
+
+function fmt(value, decimals, unit) {
+  return value == null ? "—" : `${Number(value).toFixed(decimals)}${unit}`;
+}
+
+function unitHealth(u, masterOnline) {
+  if (u.online === false || (u.unit === 0 && masterOnline === false)) return { text: "desconectada", cls: "bad" };
+  if (u.unit > 0 && u.synced === 0) return { text: "sin sincronizar", cls: "warn" };
+  return { text: "en línea", cls: "ok" };
+}
+
+function renderUnits() {
+  const view = document.getElementById("unitsView");
+  view.innerHTML = "";
+  const snap = unitsByInst[activeInst];
+  if (!snap) return;
+
+  const latest = snap.latest_v;
+  const allUnits = snap.groups.flatMap((g) => g.units);
+
+  // Every unit must hold the same frames, otherwise FRM5 shows different
+  // images: flag any unit whose frames CRC differs from the most common one.
+  const crcCounts = {};
+  for (const u of allUnits) {
+    const crc = u.frames?.crc;
+    if (crc) crcCounts[crc] = (crcCounts[crc] || 0) + 1;
+  }
+  const crcs = Object.keys(crcCounts).sort((a, b) => crcCounts[b] - crcCounts[a]);
+  const mainCrc = crcs[0];
+
+  const summary = el("div", "units-summary");
+  summary.appendChild(el("span", "", latest > 0 ? `Última orden: v${latest}` : "Todavía no se envió ninguna orden"));
+  if (crcs.length > 1) summary.appendChild(el("span", "units-alert", "Las unidades no tienen las mismas escenas grabadas"));
+  view.appendChild(summary);
+
+  for (const g of snap.groups) {
+    const section = el("section", "unit-group");
+    const header = el("div", "unit-group-header");
+    header.appendChild(el("h2", "", `Grupo ${g.group}`));
+    const masterState = g.online === true ? ["maestro conectado", "ok"]
+      : g.online === false ? ["maestro desconectado", "bad"] : ["maestro sin datos", "dim"];
+    header.appendChild(el("span", `unit-badge ${masterState[1]}`, masterState[0]));
+    if (g.hello?.fw) header.appendChild(el("span", "unit-meta", `fw ${g.hello.fw}`));
+
+    // NET0 turns off the master's data connection: from then on it's
+    // unreachable over MQTT, and only an SMS (NET1) brings it back.
+    const netBtn = el("button", "unit-action danger", "Cortar datos (NET0)");
+    netBtn.type = "button";
+    netBtn.addEventListener("click", () => {
+      if (!confirm(`¿Desactivar la conexión de datos del maestro del grupo ${g.group}? Solo se puede volver a activar por SMS (NET1).`)) return;
+      runButton(netBtn, () => unitCommand(g.group, 0, "NET0"));
+    });
+    header.appendChild(netBtn);
+    section.appendChild(header);
+
+    if (g.units.length === 0) {
+      section.appendChild(el("p", "upcoming-empty", "Sin reportes todavía."));
+      view.appendChild(section);
+      continue;
+    }
+
+    const table = el("table", "units-table");
+    const head = el("tr");
+    for (const h of ["Unidad", "Estado", "Orden", "Señal", "Temp.", "Error", ""]) head.appendChild(el("th", "", h));
+    table.appendChild(el("thead")).appendChild(head);
+    const body = el("tbody");
+
+    for (const u of g.units) {
+      const row = el("tr", u.online === false ? "offline" : "");
+      row.appendChild(el("td", "unit-name", u.unit === 0 ? "U0 · maestro" : `U${u.unit}`));
+
+      const health = unitHealth(u, g.online);
+      row.appendChild(el("td", `unit-${health.cls}`, health.text));
+
+      if (u.v == null) {
+        row.appendChild(el("td", "", "—"));
+      } else {
+        const upToDate = u.v >= latest;
+        row.appendChild(el("td", upToDate ? "unit-ok" : "unit-warn", `v${u.v} · ${upToDate ? "al día" : "atrasada"}`));
+      }
+
+      if (u.unit === 0 || u.rssi_from_master == null) {
+        row.appendChild(el("td", "", "—"));
+      } else {
+        const weak = u.rssi_from_master < WEAK_SIGNAL_DBM || (u.rssi_at_master ?? 0) < WEAK_SIGNAL_DBM;
+        const snr = u.snr_from_master == null ? "" : ` · SNR ${u.snr_from_master}`;
+        row.appendChild(el("td", weak ? "unit-warn" : "", `${u.rssi_from_master} dBm${snr}`));
+      }
+
+      row.appendChild(el("td", "", fmt(u.aht_temp_c ?? u.temp_c, 1, "°C")));
+
+      const errors = [];
+      if (u.last_error) errors.push(u.last_error);
+      if (u.frames?.crc && crcs.length > 1 && u.frames.crc !== mainCrc) errors.push("escenas distintas");
+      row.appendChild(el("td", errors.length ? "unit-error" : "", errors.join(" · ") || "—"));
+
+      const actionCell = el("td");
+      const staBtn = el("button", "unit-action", "STA");
+      staBtn.type = "button";
+      staBtn.addEventListener("click", () => runButton(staBtn, () => unitCommand(g.group, u.unit, "STA")));
+      actionCell.appendChild(staBtn);
+      row.appendChild(actionCell);
+
+      body.appendChild(row);
+    }
+    table.appendChild(body);
+    section.appendChild(table);
+    view.appendChild(section);
+  }
+}
+
 // ---------- boot ----------
-loadDevices();
+loadInstallations();
 loadProfile();
 connectLogSocket();
 loadSchedules();

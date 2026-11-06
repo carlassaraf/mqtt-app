@@ -4,10 +4,13 @@ Kept deliberately dumb (plain JSON, no env-var magic) so it's easy for
 a non-dev to edit on the device itself if needed.
 """
 import json
+import logging
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT / "config.json"
+
+logger = logging.getLogger("config")
 
 
 def load_config() -> dict:
@@ -20,31 +23,44 @@ def load_config() -> dict:
         return json.load(f)
 
 
-def _load_devices(mqtt_cfg: dict) -> list[dict]:
+def _load_installations(cfg: dict, mqtt_cfg: dict) -> list[dict]:
     """
-    Multiple physical columns share one broker and the same log_topic
-    (everyone's status messages land in one shared stream); only their
-    command_topic differs, so that's all "devices" in config.json lists.
-    Older config.json files (from before device switching existed) instead
-    have a single flat command_topic right on the mqtt block; that shape
-    still works, normalized here into a one-item devices list, so an
-    existing on-device config.json isn't broken by this update until
-    someone gets around to editing it.
+    Firmware 2.0 is addressed per installation (all of its units at once),
+    listed under `installations` -- at the top level of config.json or inside
+    the mqtt block, either works. Each one needs `inst` (the number on the
+    units' stickers); `label` and `groups` (the group numbers to roll-call)
+    are optional.
+
+    Older config.json files list firmware 1.x `devices` (one command_topic
+    each) instead. Those devices can't be driven by this version, but such a
+    file still loads: it falls back to a single installation 1, group 1, so
+    an on-device config.json that nobody has edited yet doesn't stop the app
+    from starting.
     """
-    devices = mqtt_cfg.get("devices")
-    if devices:
-        return devices
-    return [{
-        "id": "columna1",
-        "label": "Columna 1 (NQN)",
-        "command_topic": mqtt_cfg["command_topic"],
-        "status_tag": "COL-02",
-    }]
+    installations = cfg.get("installations") or mqtt_cfg.get("installations")
+    if not installations:
+        if mqtt_cfg.get("devices") or mqtt_cfg.get("command_topic"):
+            logger.warning(
+                "config.json lists firmware 1.x devices; using installation 1 instead. "
+                "Add an \"installations\" list (see config.example.json)."
+            )
+        installations = [{"inst": 1}]
+    result = []
+    for item in installations:
+        inst = int(item["inst"])
+        result.append({
+            "inst": inst,
+            "label": item.get("label") or f"Instalación {inst}",
+            "groups": [int(g) for g in item.get("groups", [1])],
+        })
+    return result
 
 
 config = load_config()
 MQTT_CFG = config["mqtt"]
-DEVICES = _load_devices(MQTT_CFG)
+# The firmware's CONFIG_APP_TOPIC_PREFIX; must match the units'.
+TOPIC_PREFIX = (config.get("topic_prefix") or MQTT_CFG.get("topic_prefix") or "columna").strip("/")
+INSTALLATIONS = _load_installations(config, MQTT_CFG)
 APP_CFG = config["app"]
 DB_PATH = ROOT / APP_CFG["db_path"]
 PROFILE_PATH = ROOT / APP_CFG["profile_path"]

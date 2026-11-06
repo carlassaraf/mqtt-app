@@ -12,7 +12,7 @@
   <div class="topbar-top">
     <h1>COLUMNAS INTELIGENTES</h1>
     <div class="topbar-actions">
-      <select class="device-select" id="deviceSelect" aria-label="Dispositivo objetivo"></select>
+      <select class="device-select" id="installationSelect" aria-label="Instalación objetivo"></select>
       <button class="icon-btn minimize-app-btn" id="minimizeAppBtn" aria-label="Minimizar aplicación">&minus;</button>
       <button class="icon-btn update-app-btn" id="updateAppBtn" aria-label="Actualizar aplicación">&#8635;</button>
       <button class="icon-btn close-app-btn" id="closeAppBtn" aria-label="Cerrar aplicación">&times;</button>
@@ -35,6 +35,7 @@
   <button class="tab" data-tab="schedule">Programación</button>
   <button class="tab" data-tab="pending">Eventos Pendientes</button>
   <button class="tab" data-tab="special">Comandos Especiales</button>
+  <button class="tab" data-tab="units">Unidades</button>
   <button class="tab" data-tab="status">Status</button>
 </nav>
 
@@ -57,6 +58,11 @@
     <div class="command-grid large" id="specialCommandGrid"><!-- populated by app.js --></div>
     <h2 class="section-heading">Colores rápidos</h2>
     <div class="command-grid large" id="presetCommandGrid"><!-- populated by app.js --></div>
+  </section>
+
+  <section id="tab-units" class="tab-panel">
+    <button class="primary units-refresh" id="refreshUnitsBtn" type="button">Actualizar unidades</button>
+    <div class="units-view" id="unitsView"><!-- populated by app.js --></div>
   </section>
 
   <section id="tab-status" class="tab-panel">

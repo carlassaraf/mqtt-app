@@ -10,12 +10,15 @@ a subscribed topic, and lets you schedule commands for a future date/time.
 app/
   main.py            FastAPI app, mounts routes + static/templates
   config.py          loads config.json
-  db.py              sqlite: logs + scheduled_commands tables
-  mqtt_client.py      paho-mqtt wrapper: subscribe, log, publish, websocket fan-out
+  db.py              sqlite: logs, scheduled_commands, orders, installations tables
+  manager.py          installation manager: validates, numbers and publishes orders
+  mqtt_client.py      paho-mqtt wrapper: subscribe, route by topic, send orders, websocket fan-out
+  device_state.py     what each installation shows + per-unit health
   scheduler.py        APScheduler wrapper, persisted via sqlite, re-arms on restart
   models.py            request/response pydantic models
   routes/
-    commands.py        GET profile, POST send command
+    commands.py        GET profile, POST send command / order
+    installations.py   installations, units table, maintenance (ROL/STA/NET0)
     logs.py             GET history, WS live tail
     schedule.py         CRUD for scheduled commands
   static/              vanilla JS + CSS frontend (no build step)
@@ -65,7 +68,9 @@ automatically -- no frontend code changes needed to add or adjust a command:
 
 Supported `value_type`s: `slider`, `number`, `hex_color` (color picker,
 `#` stripped automatically), `toggle` (renders 0/1), and `none` (no input --
-`INV`, `AUT`, `STA`). A `fixed_value` field (used for `NET`) skips the input
+`INV`, `AUT`). Only display commands belong in the profile: they're sent as
+numbered orders to a whole installation (firmware 2.0, see `CONTEXT.md`).
+Unit maintenance (`STA`, `ROL`, `NET0`) lives in the Unidades tab. A `fixed_value` field (used for `NET`) skips the input
 entirely and always sends that exact value; pair it with `"confirm": true` +
 `"confirm_text"` to force a confirmation dialog before sending.
 
@@ -82,16 +87,16 @@ entirely and always sends that exact value; pair it with `"confirm": true` +
   phone numbers. That's independent of this app and not wired in here --
   worth asking the client whether they want SMS visibility in the UI too
   (e.g. showing the same notifications this app can't see).
-- **`NET1`.** Only sendable via SMS by design (the device is offline from
-  MQTT's perspective once `NET0` is sent), so it isn't exposed in the
-  command profile at all -- only `NET0` is, gated behind a confirmation
-  dialog since it's a one-way door from this app's perspective.
+- **`NET1`.** Only sendable via SMS by design (a master is offline from
+  MQTT's perspective once `NET0` is sent), so it isn't offered at all --
+  only `NET0` is, per group master in the Unidades tab, gated behind a
+  confirmation dialog since it's a one-way door from this app's perspective.
 - **Public broker, no auth.** `broker.hivemq.com` has no username/password,
   so anyone who knows the topic name can publish to it -- the device's own
   input validation is the real safety net, not the broker. Worth knowing if
   the client ever asks "who else can control this."
-- **Client ID collision.** The device's own MQTT client ID is
-  `columna-master` -- this app's config uses a different one
+- **Client ID collision.** Masters use the MQTT client ID
+  `columna-<inst>-<group>-<unit>` -- this app's config uses a different one
   (`led-kiosk-controller`) on purpose. Don't change it to match the
   device's, or one of the two will get disconnected by the broker.
 
@@ -126,14 +131,12 @@ entirely and always sends that exact value; pair it with `"confirm": true` +
 
 ## Not yet built (intentionally)
 
-- **LoRa transport.** `mqtt_client.publish_command(command_id, value)` is the
-  single choke point every command goes through, and `build_payload()`
-  already produces the exact wire string (`"FRM5"`) independent of MQTT --
-  so adding LoRa later is mostly a sibling `lora_client.publish_command()`
-  that reuses `build_payload()` and sends the same string over the radio
-  module instead, plus a way to pick the transport per-command (or a
-  fallback: try MQTT, fall back to LoRa if the broker's unreachable). No
-  changes needed to the UI, the profile schema, or the scheduler.
+- **Moving the installation manager off the kiosk.** `app/manager.py` is the
+  one place orders get numbered; it runs inside the kiosk app for now (one
+  kiosk, one broker). Once a server exists it moves there and
+  `mqtt_client.send_order()` calls it instead. Never run two numbering
+  sources against the same installation (that includes the firmware repo's
+  `tools/test_installation.py`).
 - **Auth.** There's no login on the API/UI. Fine on an isolated kiosk device;
   add something before exposing this beyond localhost.
 - **A7600 AT-command integration.** Connectivity is handled at the OS level

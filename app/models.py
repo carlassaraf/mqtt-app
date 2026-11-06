@@ -9,16 +9,24 @@ class SendCommandRequest(BaseModel):
     value: Optional[Union[int, str]] = None
 
 
-class SelectDeviceRequest(BaseModel):
-    device_id: str
-
-
-class ScheduleCommand(BaseModel):
+class OrderCommand(BaseModel):
     command_id: str
     value: Optional[Union[int, str]] = None
 
 
+class SendOrderRequest(BaseModel):
+    commands: list[OrderCommand]  # applied together, as one order
+
+
+class SelectInstallationRequest(BaseModel):
+    inst: int
+
+
+class UnitCommandRequest(BaseModel):
+    command: str  # STA, or ROL / NET0 / NET1 for a group master (unit 0)
+
+
 class ScheduleRequest(BaseModel):
     label: str  # human-readable description of the state, shown in the pending list
-    commands: list[ScheduleCommand]  # sent in order when the schedule fires
+    commands: list[OrderCommand]  # sent as one order when the schedule fires
     run_at: datetime  # ISO 8601, e.g. from <input type="datetime-local">

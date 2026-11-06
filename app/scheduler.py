@@ -4,8 +4,8 @@ timing, backed by our own sqlite table (app.db) so pending jobs survive an
 app restart -- on startup we re-read pending rows and re-arm them.
 
 Kept independent from mqtt_client's connection state: if MQTT happens to be
-down at fire time, publish_command() returns False and we mark the job
-'failed' rather than losing it silently.
+down at fire time, send_order() returns False and we mark the job 'failed'
+rather than losing it silently.
 """
 import json
 import logging
@@ -16,17 +16,10 @@ from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from app import db
-from app.mqtt_client import broadcast_event, is_connected, publish_command, request_status_all, request_status_automatic
+from app.mqtt_client import broadcast_event, is_connected, send_order
 
 logger = logging.getLogger("scheduler")
 scheduler = BackgroundScheduler()
-
-# Firmware observed corrupting/misattributing payloads when a burst of commands
-# arrives faster than its ~100ms dispatch tick can drain them (device-side
-# queueing bug, not something this app can fix) -- so pace successive commands
-# in one scheduled state out with a gap comfortably above that tick instead of
-# firing them back-to-back.
-INTER_COMMAND_DELAY_S = 0.3
 
 # The device is normally powered off overnight, so the app itself may not be
 # running when a schedule's run_at passes. On restart, a schedule missed by
@@ -36,40 +29,24 @@ INTER_COMMAND_DELAY_S = 0.3
 MISSED_SCHEDULE_CATCHUP_S = 16 * 3600
 
 # How long to wait for MQTT to actually finish connecting before firing
-# catch-up commands at startup. main.py calls mqtt_client.start() (which only
+# catch-up orders at startup. main.py calls mqtt_client.start() (which only
 # *initiates* the connection via connect_async) immediately before
 # scheduler.start() -- so right after boot, is_connected() is almost always
-# still False, and publish_command() would otherwise fail immediately.
+# still False, and send_order() would otherwise fail immediately.
 CATCHUP_CONNECT_TIMEOUT_S = 30
 CATCHUP_POLL_INTERVAL_S = 1
 
-# Safety net for the command cards' last-known values (app/device_state.py)
-# drifting from reality -- e.g. someone changing the device over SMS, or the
-# device rebooting into automatic mode -- without waiting for someone to
-# press STA by hand.
-STATUS_REFRESH_INTERVAL_S = 3600
-
-# In automatic mode the device moves to the next frame on its own every ~2
-# minutes, so devices in that mode are polled on the same period to keep the
-# frame card current.
-AUTOMATIC_STATUS_REFRESH_INTERVAL_S = 120
-
 
 def _run_job(schedule_id: int, label: str, commands: list[dict]):
-    """Fires every command in the state, in order, paced by INTER_COMMAND_DELAY_S.
-    One failed publish doesn't stop the rest from going out -- but the row is
-    marked 'failed' overall if any of them didn't make it, since the resulting
-    state may be incomplete. Runs on APScheduler's own worker thread, so the
-    blocking sleep here doesn't hold up the web server."""
-    all_ok = True
-    for i, cmd in enumerate(commands):
-        if i > 0:
-            time.sleep(INTER_COMMAND_DELAY_S)
-        ok, _ = publish_command(cmd["command_id"], cmd.get("value"))
-        all_ok = all_ok and ok
-    status = "sent" if all_ok else "failed"
+    """Sends the whole state as one order to the active installation: every
+    unit applies all of its commands together, at the same instant. Runs on
+    APScheduler's own worker thread."""
+    ok, result = send_order(
+        None, [(cmd["command_id"], cmd.get("value")) for cmd in commands], source="schedule"
+    )
+    status = "sent" if ok else "failed"
     db.mark_schedule(schedule_id, status)
-    logger.info("Scheduled state %s (%d commands) -> %s", schedule_id, len(commands), status)
+    logger.info("Scheduled state %s (%d commands) -> %s (%s)", schedule_id, len(commands), status, result)
     # Lets the frontend (open on the kiosk screen or not) pop up a notice the
     # instant a schedule actually fires, over the same /ws/logs socket the
     # live MQTT log already uses -- see broadcast_event's docstring.
@@ -100,13 +77,6 @@ def remove_scheduled_command(schedule_id: int):
 def start():
     scheduler.start()
     _rearm_pending()
-    scheduler.add_job(request_status_all, "interval", seconds=STATUS_REFRESH_INTERVAL_S, id="status_refresh")
-    scheduler.add_job(
-        request_status_automatic,
-        "interval",
-        seconds=AUTOMATIC_STATUS_REFRESH_INTERVAL_S,
-        id="automatic_status_refresh",
-    )
 
 
 def _wait_for_mqtt_then_catch_up(catchup: list[tuple[int, str, list[dict]]]):
@@ -114,15 +84,13 @@ def _wait_for_mqtt_then_catch_up(catchup: list[tuple[int, str, list[dict]]]):
     MQTT to connect, then fires each missed-but-recent schedule in
     chronological order -- if several were missed, the last one firing last
     is correct, it's exactly what would have happened had the device stayed
-    on overnight. Paced the same as commands within one schedule, for the
-    same reason (avoids a firmware-queue-corrupting burst)."""
+    on overnight. Each one is its own numbered order, so they're applied in
+    sequence without any pacing."""
     waited = 0
     while not is_connected() and waited < CATCHUP_CONNECT_TIMEOUT_S:
         time.sleep(CATCHUP_POLL_INTERVAL_S)
         waited += CATCHUP_POLL_INTERVAL_S
-    for i, (schedule_id, label, commands) in enumerate(catchup):
-        if i > 0:
-            time.sleep(INTER_COMMAND_DELAY_S)
+    for schedule_id, label, commands in catchup:
         _run_job(schedule_id, label, commands)
 
 

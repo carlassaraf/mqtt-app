@@ -47,12 +47,35 @@ Raspberry Pi 4 (kiosk app)
      LoRa
 ```
 
-`app/mqtt_client.py:build_payload()` is the single choke point that turns a
-`(command_id, value)` pair into the device's wire string. Both the
-immediate-send path (`routes/commands.py`) and the scheduler
-(`scheduler.py`) call `publish_command()`, which calls `build_payload()`
-internally — so a future LoRa transport just needs a sibling function that
-reuses `build_payload()` and sends over the radio instead.
+**Firmware 2.0: installations, numbered orders.** The app talks to
+*installations* (all of their units at once), not to single devices. Every
+command goes out as part of a numbered **order**:
+`{"v": 12, "at": <UTC ms>, "cmds": ["FRM5", "BRI70"]}` on
+`<prefix>/<inst>/cmd` (QoS 1, never retained). Masters apply an order only if
+`v` is exactly one more than theirs, and every unit switches at `at`.
+
+- `app/mqtt_client.py:build_payload()` still turns each `(command_id, value)`
+  pair into the wire string. `send_order(inst, [(id, value), ...])` builds
+  them and hands the list to `app/manager.py:submit()`.
+- `app/manager.py` is the **only** numbering source: it validates (same
+  ranges as the firmware), takes the next `v`, publishes and stores the order
+  in sqlite (`orders`, `installations.next_v`), under one lock. It also moves
+  the counter past any higher `v` seen in the retained scene or a unit
+  status, and numbers SMS orders masters forward on `<prefix>/<inst>/cmd/in`.
+  Only one process may do this per installation (it lives in the kiosk for
+  now; it moves to a server once there is one).
+- Units report retained JSON on `<prefix>/<inst>/<group>/<unit>/status`;
+  group masters also publish `…/0/hello` and `…/0/online`. These feed the
+  Unidades tab. Log lines on `<prefix>/<inst>/log` go to the live log view.
+- What the installation shows (the values on the command cards) follows from
+  the orders sent (`device_state.record_order()`), starting from the boot
+  state (frame 3, 70%, 100 ms rotation, loop off) and rebuilt from the stored
+  orders on restart. There's no status parsing any more.
+- Maintenance goes to one unit on `<prefix>/<inst>/<group>/<unit>/cmd`:
+  `STA` (fresh status), `ROL` (roll call of a group, unit 0 only) and `NET0`
+  (a master's data connection, unit 0 only).
+
+See `docs/ARCHITECTURE.md` §12 in the firmware repo for the design.
 
 ## The device protocol (Columna RGB) — from the client's own guide
 
@@ -69,28 +92,35 @@ the whole string regardless of input casing.
 | `ROT` | Rotation/marquee speed | int ms, 0 = off | |
 | `INV` | Invert rotation direction | none | |
 | `AUT` | Resume automatic mode | none | |
-| `STA` | Request status report | none | |
-| `NET` | Enable/disable MQTT | `0`/`1` | **`0` sendable via MQTT; `1` only via SMS** (device is offline from MQTT's view after `NET0`) — only `NET0` is in the app's profile, gated behind a confirm dialog |
+| `CLR` | Undo the last `FRM`/`PPG`/`FIL` (one level) | none | |
 | `PPG` | Ping-pong mode | `0`/`1` | |
 | `PPC` | Ping-pong ball color | hex, no `#` | |
 | `PPK` | Ping-pong background color | hex, no `#` | |
+| `SCR` / `SCL` | Strip-color rotation / the 3 strip colors | `0`/`1` / 18 hex digits | |
+| `FIL` | Fill mode | `0`/`1` | |
+| `OUT` / `OVR` | Status LED / input-gate override | `0`/`1` | |
+| `STA` | Fresh status of one unit | none | Maintenance, not an order (Unidades tab) |
+| `ROL` | Roll call of a whole group | none | Maintenance, group master only |
+| `NET` | Enable/disable a master's data connection | `0`/`1` | Maintenance, group master only. **`NET1` only via SMS** (the master is offline from MQTT's view after `NET0`); the Unidades tab offers `NET0` behind a confirm dialog |
 
 Sending `FRM`/`BRI`/`BLK`/`ROT`/`INV`/`PPG1` pauses automatic mode until
 `AUT` is sent or the device reboots.
 
-**MQTT connection**: `broker.hivemq.com:1883`, no auth. Command topic
-`columna/led`, log topic `columna/log`. Device's own MQTT client ID is
-`columna-master` — **this app must use a different client ID**
-(`led-kiosk-controller` in config) or the broker will boot one of the two
-connections on collision.
+**MQTT connection**: `broker.hivemq.com:1883`, no auth. Topics under
+`<topic_prefix>/<inst>/` (`topic_prefix` in config.json must match the
+firmware's `CONFIG_APP_TOPIC_PREFIX`, default `columna`). Masters use the
+client ID `columna-<inst>-<group>-<unit>` — **this app must use a different
+one** (`led-kiosk-controller` in config) or the broker will boot one of the
+two connections on collision.
 
 **Out of scope / not built, by design:**
 - SMS backup channel (device's own no-internet fallback + status
-  notifications to 2 authorized numbers) — independent of this app.
+  notifications to 2 authorized numbers) — handled by the masters. The only
+  part this app sees: a master with a data connection forwards SMS orders on
+  `cmd/in`, and the manager numbers them like any other order.
   Worth asking the client if they want SMS notification visibility surfaced
   in the UI too.
-- `NET1` — SMS-only per the device's own design, deliberately excluded
-  from the command profile.
+- `NET1` — SMS-only per the device's own design, deliberately not offered.
 - Any auth/access control on the broker itself — it's public, the device's
   own input validation is the real safety net.
 
@@ -100,14 +130,16 @@ connections on collision.
 app/
   main.py             FastAPI app, startup/shutdown wiring
   config.py            loads config.json (copy from config.example.json)
-  db.py                 sqlite: logs + scheduled_commands tables
-  mqtt_client.py        paho-mqtt wrapper + build_payload() + websocket fan-out
-  device_state.py        last-known property values per device (from sent commands + parsed STA replies), shown on the command cards
-  scheduler.py           APScheduler wrapper, sqlite-persisted, re-arms on restart
+  db.py                 sqlite: logs, scheduled_commands, orders, installations tables
+  manager.py            installation manager: validates, numbers (v), publishes and stores orders
+  mqtt_client.py        paho-mqtt wrapper + build_payload() + send_order() + topic routing + websocket fan-out
+  device_state.py        what each installation shows (from the orders sent) + per-unit health (from the retained statuses)
+  scheduler.py           APScheduler wrapper, sqlite-persisted, re-arms on restart; each state fires as one order
   network_status.py       reads active default-route interface (wifi/lte/ethernet) for /api/status
   models.py               SendCommandRequest / ScheduleRequest (label + ordered list of commands, i.e. a "state")
   routes/
-    commands.py            GET profile, POST send
+    commands.py            GET profile, POST send (one command) / order (several, applied together)
+    installations.py         list/select installation, display state, units table, ROL / STA / NET0
     logs.py                  GET history, WS live tail (/ws/logs)
     schedule.py              CRUD scheduled commands
   static/js/app.js       all frontend logic (single-value-per-command rendering), UI is in Spanish

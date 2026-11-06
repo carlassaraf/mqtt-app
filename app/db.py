@@ -1,5 +1,5 @@
 """
-Plain sqlite3 (no ORM needed for two small tables). One connection per
+Plain sqlite3 (no ORM needed for a few small tables). One connection per
 call is fine at this scale and keeps things thread-safe without extra care.
 """
 import sqlite3
@@ -25,6 +25,25 @@ CREATE TABLE IF NOT EXISTS scheduled_commands (
     run_at REAL NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
     created_at REAL NOT NULL
+);
+
+-- Numbered orders sent to an installation (app/manager.py). v runs 1, 2, 3...
+-- per installation with no gaps; the primary key makes a repeat impossible.
+CREATE TABLE IF NOT EXISTS orders (
+    inst INTEGER NOT NULL,
+    v INTEGER NOT NULL,
+    at_ms INTEGER NOT NULL,
+    cmds_json TEXT NOT NULL,
+    source TEXT NOT NULL,
+    created_at REAL NOT NULL,
+    PRIMARY KEY (inst, v)
+);
+
+-- next_v: the version the next order to this installation gets.
+CREATE TABLE IF NOT EXISTS installations (
+    inst INTEGER PRIMARY KEY,
+    label TEXT NOT NULL,
+    next_v INTEGER NOT NULL DEFAULT 1
 );
 """
 
@@ -101,3 +120,55 @@ def mark_schedule(schedule_id: int, status: str):
 def delete_schedule(schedule_id: int):
     with get_conn() as conn:
         conn.execute("DELETE FROM scheduled_commands WHERE id = ?", (schedule_id,))
+
+
+def ensure_installation(inst: int, label: str):
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO installations (inst, label, next_v) VALUES (?, ?, 1) "
+            "ON CONFLICT(inst) DO UPDATE SET label = excluded.label",
+            (inst, label),
+        )
+
+
+def get_next_versions() -> dict[int, int]:
+    """next_v per installation: the stored counter, but never below one past
+    the highest order actually stored."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT i.inst, MAX(i.next_v, COALESCE((SELECT MAX(v) FROM orders o WHERE o.inst = i.inst), 0) + 1) "
+            "AS next_v FROM installations i"
+        ).fetchall()
+    return {r["inst"]: r["next_v"] for r in rows}
+
+
+def set_next_version(inst: int, next_v: int):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE installations SET next_v = MAX(next_v, ?) WHERE inst = ?",
+            (next_v, inst),
+        )
+
+
+def insert_order(inst: int, v: int, at_ms: int, cmds_json: str, source: str):
+    """Stores a published order and moves the installation's counter past it,
+    in one transaction."""
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO orders (inst, v, at_ms, cmds_json, source, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (inst, v, at_ms, cmds_json, source, time.time()),
+        )
+        conn.execute(
+            "UPDATE installations SET next_v = MAX(next_v, ?) WHERE inst = ?",
+            (v + 1, inst),
+        )
+
+
+def list_orders(inst: int) -> list[dict]:
+    """Every stored order for one installation, oldest first."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM orders WHERE inst = ? ORDER BY v", (inst,)
+        ).fetchall()
+    return [dict(r) for r in rows]
