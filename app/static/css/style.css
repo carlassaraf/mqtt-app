@@ -340,7 +340,9 @@ input[type="checkbox"] { width: 32px; height: 32px; accent-color: var(--accent);
 .gps-rows .gps-on { color: var(--green); }
 .gps-rows .gps-warn { color: var(--warn); }
 .gps-rows .gps-off { color: var(--text-dim); }
-.gps-rows .gps-map-btn { margin-top: 4px; }
+/* Info on the left, "Ver en el mapa" on the right */
+.gps-body { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.gps-map-btn { flex-shrink: 0; }
 
 /* Map overlay ("Ver en el mapa"): over the sheet, under the toasts */
 .map-overlay {

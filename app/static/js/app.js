@@ -448,6 +448,7 @@ function renderGpsSheet() {
     box.appendChild(header);
 
     const rows = el("dl", "gps-rows");
+    let mapBtn = null;
     const add = (label, value, cls = "") => {
       rows.appendChild(el("dt", "", label));
       rows.appendChild(el("dd", cls, value));
@@ -465,15 +466,16 @@ function renderGpsSheet() {
       add("Latitud", gps.lat.toFixed(6));
       add("Longitud", gps.lon.toFixed(6));
       if (gps.state !== "fix") add("", "Última posición conocida", "gps-off");
-      const mapBtn = el("button", "unit-action gps-map-btn", "Ver en el mapa");
+      mapBtn = el("button", "unit-action gps-map-btn", "Ver en el mapa");
       mapBtn.type = "button";
       const { lat, lon } = gps;
       mapBtn.addEventListener("click", () => openMap(`Grupo ${g.group}`, lat, lon));
-      rows.appendChild(el("dt"));
-      rows.appendChild(el("dd")).appendChild(mapBtn);
     }
     if (gps.updatedAt) add("Actualizado", new Date(gps.updatedAt * 1000).toLocaleTimeString());
-    box.appendChild(rows);
+    const body = el("div", "gps-body");
+    body.appendChild(rows);
+    if (mapBtn) body.appendChild(mapBtn);
+    box.appendChild(body);
     sheet.appendChild(box);
   }
 }
