@@ -340,6 +340,19 @@ input[type="checkbox"] { width: 32px; height: 32px; accent-color: var(--accent);
 .gps-rows .gps-on { color: var(--green); }
 .gps-rows .gps-warn { color: var(--warn); }
 .gps-rows .gps-off { color: var(--text-dim); }
+.gps-rows .gps-map-btn { margin-top: 4px; }
+
+/* Map overlay ("Ver en el mapa"): over the sheet, under the toasts */
+.map-overlay {
+  position: fixed; inset: 0; z-index: 20; background: var(--bg);
+  display: flex; flex-direction: column;
+}
+.map-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 12px 20px; border-bottom: 1px solid var(--border);
+}
+.map-title { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.map-frame { flex: 1; width: 100%; border: 0; background: var(--surface); }
 
 /* ---- Toasts (scheduled program fired) ----
    Non-blocking, top of screen, auto-dismiss -- unlike the sheet/keypad

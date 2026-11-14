@@ -465,11 +465,42 @@ function renderGpsSheet() {
       add("Latitud", gps.lat.toFixed(6));
       add("Longitud", gps.lon.toFixed(6));
       if (gps.state !== "fix") add("", "Última posición conocida", "gps-off");
+      const mapBtn = el("button", "unit-action gps-map-btn", "Ver en el mapa");
+      mapBtn.type = "button";
+      const { lat, lon } = gps;
+      mapBtn.addEventListener("click", () => openMap(`Grupo ${g.group}`, lat, lon));
+      rows.appendChild(el("dt"));
+      rows.appendChild(el("dd")).appendChild(mapBtn);
     }
     if (gps.updatedAt) add("Actualizado", new Date(gps.updatedAt * 1000).toLocaleTimeString());
     box.appendChild(rows);
     sheet.appendChild(box);
   }
+}
+
+// The kiosk's Chromium runs with --kiosk: a link to Google Maps would open a
+// full-screen window with no way back. The map opens in an overlay over the
+// app instead, and the iframe is sandboxed without allow-popups /
+// allow-top-navigation, so the links inside the map ("Ver mapa más grande",
+// …) can't open windows or navigate the kiosk away. Needs internet access.
+function openMap(title, lat, lon) {
+  const overlay = el("div", "map-overlay");
+  const bar = el("div", "map-bar");
+  bar.appendChild(el("span", "map-title", `${title} · ${lat.toFixed(6)}, ${lon.toFixed(6)}`));
+  const closeBtn = el("button", "icon-btn close-app-btn", "×");
+  closeBtn.type = "button";
+  closeBtn.setAttribute("aria-label", "Cerrar mapa");
+  closeBtn.addEventListener("click", () => overlay.remove());
+  bar.appendChild(closeBtn);
+  overlay.appendChild(bar);
+
+  const frame = el("iframe", "map-frame");
+  frame.setAttribute("sandbox", "allow-scripts allow-same-origin");
+  frame.setAttribute("referrerpolicy", "no-referrer-when-downgrade");
+  frame.title = `Mapa: ${title}`;
+  frame.src = `https://maps.google.com/maps?q=${lat},${lon}&z=17&hl=es&output=embed`;
+  overlay.appendChild(frame);
+  document.body.appendChild(overlay);
 }
 
 function openGpsSheet() {
