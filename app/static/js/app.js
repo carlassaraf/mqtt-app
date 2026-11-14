@@ -366,22 +366,116 @@ function renderCommandGrid(gridId, commands) {
 // status (see sensorReadings()), every unit's own readings being in the
 // Unidades tab; a firmware 1.x device reports them in its STA reply, under
 // these same ids.
+// GPS is the exception: its card can be tapped, and opens the position of
+// every group master (see openGpsSheet()).
 const SENSOR_INDICATORS = [
   { id: "TMP", label: "Temperatura", value_type: "reading", unit: "°C", decimals: 1, read: (u) => u.aht_temp_c },
   { id: "HUM", label: "Humedad", value_type: "reading", unit: "%", decimals: 0, read: (u) => u.aht_hum },
   { id: "CUR", label: "Corriente", value_type: "reading", unit: "A", decimals: 2,
     read: (u) => (u.power_ma == null ? null : u.power_ma / 1000) },
+  { id: "GPS", label: "GPS", value_type: "gps", read: (u) => u.gps, onTap: () => openGpsSheet() },
 ];
 
 function renderIndicatorCards(gridId) {
   const grid = document.getElementById(gridId);
   for (const indicator of SENSOR_INDICATORS) {
     const card = document.createElement("div");
-    card.className = "command-card indicator-card";
+    card.className = indicator.onTap ? "command-card" : "command-card indicator-card";
     card.innerHTML = `<span class="command-glyph" data-command-id="${indicator.id}"></span><span>${indicator.label}</span>`;
+    if (indicator.onTap) card.addEventListener("click", indicator.onTap);
     grid.appendChild(card);
   }
   refreshCommandGlyphs();
+}
+
+// ---------- GPS ----------
+// Each group master has a NEO-6M. Its status reports the last GPS check
+// ("fix" / "no_fix" / "absent"), the satellites in use and the latest
+// position; its hello carries the same lat/lon and is republished when the
+// position moves (first fix, or more than ~50 m). lat/lon stay null until the
+// first fix since boot, and keep the last known position after losing it.
+const GPS_STATES = {
+  fix: { glyph: "FIX", cls: "on", text: "Con señal" },
+  no_fix: { glyph: "SIN FIX", cls: "warn", text: "Sin señal" },
+  absent: { glyph: "SIN GPS", cls: "off", text: "Módulo GPS no detectado" },
+};
+
+function masterGps(group) {
+  const master = group.units.find((u) => u.unit === 0) || {};
+  const lat = master.lat ?? group.hello?.lat ?? null;
+  const lon = master.lon ?? group.hello?.lon ?? null;
+  return {
+    state: master.gps ?? null,
+    sats: master.gps_sats ?? null,
+    lat: lat == null ? null : Number(lat),
+    lon: lon == null ? null : Number(lon),
+    online: master.online !== false && group.online !== false,
+    updatedAt: master.updated_at ?? null,
+  };
+}
+
+let gpsSheetOpen = false;
+
+function renderGpsSheet() {
+  const sheet = document.getElementById("sheet");
+  sheet.innerHTML = "";
+
+  const closeRow = el("div", "close-row");
+  const closeBtn = el("button");
+  closeBtn.setAttribute("aria-label", "Cerrar");
+  closeBtn.innerHTML = "&times;";
+  closeBtn.addEventListener("click", closeSheet);
+  closeRow.appendChild(closeBtn);
+  sheet.appendChild(closeRow);
+  sheet.appendChild(el("h2", "", "Ubicación GPS"));
+
+  if (activeLegacy !== null) {
+    sheet.appendChild(el("p", "upcoming-empty", "Los equipos con firmware 1.x no reportan GPS."));
+    return;
+  }
+  const groups = unitsByInst[activeInst]?.groups || [];
+  if (groups.length === 0) {
+    sheet.appendChild(el("p", "upcoming-empty", "Sin reportes todavía."));
+    return;
+  }
+
+  for (const g of groups) {
+    const gps = masterGps(g);
+    const box = el("section", "gps-group");
+    const header = el("div", "unit-group-header");
+    header.appendChild(el("h3", "", `Grupo ${g.group}`));
+    if (!gps.online) header.appendChild(el("span", "unit-badge bad", "maestro desconectado"));
+    box.appendChild(header);
+
+    const rows = el("dl", "gps-rows");
+    const add = (label, value, cls = "") => {
+      rows.appendChild(el("dt", "", label));
+      rows.appendChild(el("dd", cls, value));
+    };
+    const st = GPS_STATES[gps.state];
+    if (st) {
+      const sats = gps.state === "absent" || gps.sats == null ? "" : ` · ${gps.sats} satélites`;
+      add("Estado", `${st.text}${sats}`, `gps-${st.cls}`);
+    } else {
+      add("Estado", "Sin datos", "gps-off");
+    }
+    if (gps.lat == null || gps.lon == null) {
+      add("Posición", gps.state === "absent" ? "—" : "Esperando la primera señal", "gps-off");
+    } else {
+      add("Latitud", gps.lat.toFixed(6));
+      add("Longitud", gps.lon.toFixed(6));
+      if (gps.state !== "fix") add("", "Última posición conocida", "gps-off");
+    }
+    if (gps.updatedAt) add("Actualizado", new Date(gps.updatedAt * 1000).toLocaleTimeString());
+    box.appendChild(rows);
+    sheet.appendChild(box);
+  }
+}
+
+function openGpsSheet() {
+  gpsSheetOpen = true;
+  renderGpsSheet();
+  document.getElementById("sheetBackdrop").classList.add("open");
 }
 
 // ---------- last-known values on the command cards ----------
@@ -444,6 +538,15 @@ function renderGlyph(glyph, cmd, value) {
     const [a, b, c] = String(value).match(/.{6}/g) || [];
     glyph.classList.add("color-value");
     glyph.style.background = `conic-gradient(#${a} 0 120deg, #${b} 120deg 240deg, #${c} 240deg)`;
+  } else if (cmd.value_type === "gps") {
+    const st = GPS_STATES[value];
+    if (!st) {
+      glyph.classList.remove("has-value");
+      glyph.textContent = cmd.id[0];
+      return;
+    }
+    glyph.textContent = st.glyph;
+    glyph.classList.add(st.glyph.length > 3 ? "xsmall" : "small", st.cls);
   } else if (cmd.value_type === "reading") {
     glyph.textContent = `${Number(value).toFixed(cmd.decimals)}${cmd.unit}`;
     glyph.classList.add("small");
@@ -573,7 +676,13 @@ function renderPresetGrid() {
   }
 }
 
+function closeSheet() {
+  gpsSheetOpen = false;
+  document.getElementById("sheetBackdrop").classList.remove("open");
+}
+
 function openCommandSheet(cmd) {
+  gpsSheetOpen = false;
   const backdrop = document.getElementById("sheetBackdrop");
   const sheet = document.getElementById("sheet");
   sheet.innerHTML = "";
@@ -581,7 +690,7 @@ function openCommandSheet(cmd) {
   const closeRow = document.createElement("div");
   closeRow.className = "close-row";
   closeRow.innerHTML = `<button aria-label="Cerrar">&times;</button>`;
-  closeRow.querySelector("button").addEventListener("click", () => backdrop.classList.remove("open"));
+  closeRow.querySelector("button").addEventListener("click", closeSheet);
   sheet.appendChild(closeRow);
 
   const h2 = document.createElement("h2");
@@ -622,7 +731,7 @@ function openCommandSheet(cmd) {
       });
       if (res.ok) {
         sendBtn.textContent = "Enviado";
-        setTimeout(() => backdrop.classList.remove("open"), 600);
+        setTimeout(closeSheet, 600);
         return;
       }
       const data = await res.json().catch(() => null);
@@ -640,7 +749,7 @@ function openCommandSheet(cmd) {
   backdrop.classList.add("open");
 }
 document.getElementById("sheetBackdrop").addEventListener("click", (e) => {
-  if (e.target.id === "sheetBackdrop") e.currentTarget.classList.remove("open");
+  if (e.target.id === "sheetBackdrop") closeSheet();
 });
 
 // ---------- log tab ----------
@@ -714,7 +823,10 @@ function connectLogSocket() {
     }
     if (msg.type === "units") {
       unitsByInst[msg.inst] = msg;
-      if (msg.inst === activeInst) renderUnits();
+      if (msg.inst === activeInst) {
+        renderUnits();
+        if (gpsSheetOpen) renderGpsSheet();
+      }
       refreshCommandGlyphs();
       return;
     }
@@ -1163,7 +1275,7 @@ function renderUpcoming(rows) {
 
 // ---------- units tab ----------
 // One row per (group, unit), from the retained JSON status each unit
-// publishes (every 5 minutes, and on request). "Actualizar unidades" sends a
+// publishes (every minute, and on request). "Actualizar unidades" sends a
 // roll call (ROL) to every group master; each row's STA asks one unit.
 const WEAK_SIGNAL_DBM = -110; // below this the radio link is worth a look
 
@@ -1323,7 +1435,9 @@ function renderUnits() {
         row.appendChild(el("td", weak ? "unit-warn" : "", `${u.rssi_from_master} dBm${snr}`));
       }
 
-      row.appendChild(el("td", "", fmt(u.aht_temp_c ?? u.temp_c, 1, "°C")));
+      // Only masters have an AHT10; slaves report aht_temp_c as 0.0, so they
+      // show their own temp_c.
+      row.appendChild(el("td", "", fmt(u.unit === 0 ? u.aht_temp_c ?? u.temp_c : u.temp_c, 1, "°C")));
 
       const errors = [];
       if (u.last_error) errors.push(u.last_error);

@@ -155,6 +155,9 @@ main { padding: 24px 28px 100px; flex: 1 1 auto; min-height: 0; overflow-y: auto
 .upcoming-item .upcoming-when { color: var(--accent); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .upcoming-empty { color: var(--text-dim); font-size: 20px; }
 .command-glyph.off { color: var(--text-dim); background: var(--surface-2); }
+.command-glyph.warn { color: var(--warn); background: var(--surface-2); }
+.command-glyph.xsmall { font-size: 11px; line-height: 1.1; }
+.command-grid.large .command-glyph.xsmall { font-size: 15px; }
 .command-glyph.color-value { border: 2px solid var(--border); }
 
 
@@ -324,6 +327,19 @@ input[type="checkbox"] { width: 32px; height: 32px; accent-color: var(--accent);
 .sheet .close-row button {
   background: none; border: none; color: var(--text-dim); font-size: 33px; cursor: pointer;
 }
+
+/* ---- GPS sheet (tap on the GPS card): one block per group master ---- */
+.gps-group { border-top: 1px solid var(--border); padding-top: 16px; margin-top: 16px; }
+.gps-group h3 { margin: 0; font-size: 23px; }
+.gps-rows {
+  display: grid; grid-template-columns: max-content 1fr; gap: 8px 20px;
+  margin: 0; font-size: 22px; font-variant-numeric: tabular-nums;
+}
+.gps-rows dt { color: var(--text-dim); }
+.gps-rows dd { margin: 0; }
+.gps-rows .gps-on { color: var(--green); }
+.gps-rows .gps-warn { color: var(--warn); }
+.gps-rows .gps-off { color: var(--text-dim); }
 
 /* ---- Toasts (scheduled program fired) ----
    Non-blocking, top of screen, auto-dismiss -- unlike the sheet/keypad
